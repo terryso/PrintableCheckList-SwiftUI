@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var showsShareSheet = false
     @State private var showsMailComposer = false
     @State private var showsMailUnavailable = false
+    @State private var showsDeleteAnalyticsConfirmation = false
 
     var body: some View {
         List {
@@ -50,6 +51,40 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(
+                    "Share Anonymous Usage Data",
+                    isOn: Binding(
+                        get: { store.developerAnalyticsEnabled },
+                        set: { enabled in
+                            Task {
+                                await store.setDeveloperAnalyticsEnabled(enabled)
+                            }
+                        }
+                    )
+                )
+                .disabled(!store.developerAnalyticsAvailable)
+
+                Button("Delete Shared Analytics Data", role: .destructive) {
+                    showsDeleteAnalyticsConfirmation = true
+                }
+                .disabled(!store.developerAnalyticsAvailable)
+
+                settingsButton("Privacy Policy") {
+                    openURL(
+                        URL(
+                            string: "https://blog.terryso.dev/PrintableCheckList-Privacy/"
+                        )!
+                    )
+                }
+            } header: {
+                Text("PRIVACY")
+            } footer: {
+                Text(
+                    "When enabled, your checklist text and an anonymous installation identifier are shared with the developer for product analytics. This is separate from iCloud Sync."
+                )
+            }
+
+            Section {
                 EmptyView()
             } footer: {
                 Text(versionText)
@@ -75,6 +110,37 @@ struct SettingsView: View {
             isPresented: $showsMailUnavailable
         ) {
             Button("Confirm", role: .cancel) {}
+        }
+        .confirmationDialog(
+            Text("Delete Shared Analytics Data?"),
+            isPresented: $showsDeleteAnalyticsConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Data", role: .destructive) {
+                Task {
+                    await store.deleteDeveloperAnalyticsData()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This turns off sharing and deletes the checklist snapshot associated with this installation from the developer's database."
+            )
+        }
+        .alert(
+            Text("Unable to Delete Data"),
+            isPresented: Binding(
+                get: { store.developerAnalyticsError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.clearDeveloperAnalyticsError()
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.developerAnalyticsError ?? "")
         }
     }
 

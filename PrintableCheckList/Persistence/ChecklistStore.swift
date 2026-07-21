@@ -6,6 +6,9 @@ final class ChecklistStore: ObservableObject {
     @Published private(set) var projects: [ChecklistProject] = []
     @Published private(set) var persistenceError: String?
     @Published private(set) var iCloudSyncEnabled: Bool
+    @Published private(set) var developerAnalyticsEnabled: Bool
+    @Published private(set) var hasDeveloperAnalyticsConsentDecision: Bool
+    @Published private(set) var developerAnalyticsError: String?
 
     private let storage: ChecklistStorage
     private let encoder: JSONEncoder
@@ -31,6 +34,11 @@ final class ChecklistStore: ObservableObject {
         self.developerSnapshotUploader = developerSnapshotUploader
         self.now = now
         iCloudSyncEnabled = userDefaults.object(forKey: Self.iCloudEnabledKey) as? Bool ?? true
+        let developerAnalyticsPreference = userDefaults.object(
+            forKey: Self.developerAnalyticsEnabledKey
+        ) as? Bool
+        developerAnalyticsEnabled = developerAnalyticsPreference ?? false
+        hasDeveloperAnalyticsConsentDecision = developerAnalyticsPreference != nil
         encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         decoder = JSONDecoder()
@@ -55,6 +63,41 @@ final class ChecklistStore: ObservableObject {
     func startSyncServices() async {
         startICloudSyncIfNeeded()
         await uploadDeveloperSnapshotIfDue()
+    }
+
+    var developerAnalyticsAvailable: Bool {
+        developerSnapshotUploader != nil
+    }
+
+    var shouldRequestDeveloperAnalyticsConsent: Bool {
+        developerAnalyticsAvailable && !hasDeveloperAnalyticsConsentDecision
+    }
+
+    func setDeveloperAnalyticsEnabled(_ enabled: Bool) async {
+        developerAnalyticsEnabled = enabled
+        hasDeveloperAnalyticsConsentDecision = true
+        developerAnalyticsError = nil
+        userDefaults.set(enabled, forKey: Self.developerAnalyticsEnabledKey)
+        userDefaults.removeObject(forKey: Self.developerSnapshotLastUploadKey)
+
+        if enabled {
+            await uploadDeveloperSnapshotIfDue()
+        } else {
+            await deleteDeveloperSnapshot()
+        }
+    }
+
+    func deleteDeveloperAnalyticsData() async {
+        developerAnalyticsEnabled = false
+        hasDeveloperAnalyticsConsentDecision = true
+        developerAnalyticsError = nil
+        userDefaults.set(false, forKey: Self.developerAnalyticsEnabledKey)
+        userDefaults.removeObject(forKey: Self.developerSnapshotLastUploadKey)
+        await deleteDeveloperSnapshot()
+    }
+
+    func clearDeveloperAnalyticsError() {
+        developerAnalyticsError = nil
     }
 
     func setICloudSyncEnabled(_ enabled: Bool) {
@@ -188,7 +231,9 @@ final class ChecklistStore: ObservableObject {
     }
 
     private func uploadDeveloperSnapshotIfDue() async {
-        guard let developerSnapshotUploader else { return }
+        guard developerAnalyticsEnabled, let developerSnapshotUploader else {
+            return
+        }
 
         let currentDate = now()
         let lastUploadTimestamp = userDefaults.double(
@@ -210,6 +255,19 @@ final class ChecklistStore: ObservableObject {
         }
     }
 
+    private func deleteDeveloperSnapshot() async {
+        guard let developerSnapshotUploader else { return }
+
+        do {
+            try await developerSnapshotUploader.deleteSnapshot()
+        } catch {
+            developerAnalyticsError = String(
+                format: String(localized: "Unable to delete shared analytics data: %@"),
+                error.localizedDescription
+            )
+        }
+    }
+
     private func normalizedSingleLine(_ text: String) -> String {
         text
             .trimmingCharacters(in: .newlines)
@@ -218,6 +276,7 @@ final class ChecklistStore: ObservableObject {
     }
 
     private static let iCloudEnabledKey = "keyEnableAutoSync"
+    private static let developerAnalyticsEnabledKey = "developerAnalyticsEnabled"
     private static let developerSnapshotLastUploadKey = "keyLastSyncProjects"
     private static let developerSnapshotUploadInterval: TimeInterval = 60 * 60
 }

@@ -34,7 +34,8 @@ The old app uploaded an installation-scoped JSON copy of the current lists to
 LeanCloud. It never downloaded or restored that data; iCloud was and remains
 the user-facing device-to-device sync mechanism. The rewrite can optionally
 send the same kind of one-way snapshot to a developer-owned Supabase project.
-This backend is not shown or configured in the app's Settings UI.
+Backend credentials remain developer-only; Settings exposes only the user's
+consent and deletion controls.
 
 1. Create a Supabase project and enable anonymous sign-ins under Authentication.
 2. Run `Supabase/migrations/20260721000000_create_checklist_snapshots.sql` in
@@ -42,16 +43,22 @@ This backend is not shown or configured in the app's Settings UI.
 3. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig`.
 4. Set `SUPABASE_URL` and the project's **publishable key**. Never embed a
    `service_role` or secret key in the app.
-5. Build and run. On launch, the app uploads at most once per hour per
-   installation, matching the old LeanCloud throttle.
+5. Build and run. The app asks the user before the first upload. If the user
+   agrees, it uploads at most once per hour per installation, matching the old
+   LeanCloud throttle.
 
 Anonymous Supabase users preserve the old app's installation-scoped behavior.
 iCloud still provides cross-device synchronization. Supabase snapshots are not
 a user backup or recovery feature and are never downloaded by the app.
 
-The payload contains user-entered list text. Enable this optional upload only
-after making an explicit product and privacy decision, and configure appropriate
-abuse controls for anonymous sign-ins. Otherwise leave the Supabase values empty.
+The payload contains user-entered list text. Sharing is off until the user gives
+explicit consent. Users can turn it off or delete their uploaded snapshot under
+Settings → Privacy. Apply every migration in `Supabase/migrations` so deletion
+is allowed by RLS, and configure appropriate abuse controls for anonymous
+sign-ins. Otherwise leave the Supabase values empty.
+
+The public privacy policy is hosted at
+<https://blog.terryso.dev/PrintableCheckList-Privacy/>.
 
 ### Xcode Cloud
 

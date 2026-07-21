@@ -3,6 +3,7 @@ import Supabase
 
 protocol DeveloperSnapshotUploading: Sendable {
     func upload(_ projects: [ChecklistProject]) async throws
+    func deleteSnapshot() async throws
 }
 
 enum DeveloperSnapshotConfiguration: Equatable, Sendable {
@@ -77,6 +78,17 @@ actor SupabaseDeveloperSnapshotUploader: DeveloperSnapshotUploading {
         try await client
             .from("checklist_snapshots")
             .upsert(snapshot)
+            .execute()
+    }
+
+    func deleteSnapshot() async throws {
+        guard let session = try? await client.auth.session else {
+            return
+        }
+        try await client
+            .from("checklist_snapshots")
+            .delete()
+            .eq("owner_id", value: session.user.id.uuidString)
             .execute()
     }
 

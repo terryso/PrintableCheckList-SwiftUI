@@ -55,13 +55,22 @@ private final class MemoryICloudSyncService: ICloudSyncServicing {
 
 private actor RecordingDeveloperSnapshotUploader: DeveloperSnapshotUploading {
     private var uploads: [[ChecklistProject]] = []
+    private var deletionCount = 0
 
     func upload(_ projects: [ChecklistProject]) async throws {
         uploads.append(projects)
     }
 
+    func deleteSnapshot() async throws {
+        deletionCount += 1
+    }
+
     func recordedUploads() -> [[ChecklistProject]] {
         uploads
+    }
+
+    func recordedDeletionCount() -> Int {
+        deletionCount
     }
 }
 
@@ -196,6 +205,7 @@ final class ChecklistStoreTests: XCTestCase {
     func testDeveloperSnapshotUploadIsHourlyAndUsesLatestSnapshot() async throws {
         let uploader = RecordingDeveloperSnapshotUploader()
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        defaults.set(true, forKey: "developerAnalyticsEnabled")
         var currentDate = Date(timeIntervalSince1970: 10_000)
         let store = ChecklistStore(
             storage: MemoryChecklistStorage(),
@@ -229,5 +239,51 @@ final class ChecklistStoreTests: XCTestCase {
             uploads[1].map(\.title),
             ["Travel Checklist", "Work", "Personal"]
         )
+    }
+
+    func testDeveloperAnalyticsRequiresConsentBeforeUploading() async {
+        let uploader = RecordingDeveloperSnapshotUploader()
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        let store = ChecklistStore(
+            storage: MemoryChecklistStorage(),
+            legacyData: nil,
+            locale: Locale(identifier: "en"),
+            userDefaults: defaults,
+            developerSnapshotUploader: uploader
+        )
+
+        XCTAssertTrue(store.shouldRequestDeveloperAnalyticsConsent)
+        XCTAssertFalse(store.developerAnalyticsEnabled)
+
+        await store.startSyncServices()
+        var uploads = await uploader.recordedUploads()
+        XCTAssertTrue(uploads.isEmpty)
+
+        await store.setDeveloperAnalyticsEnabled(true)
+        uploads = await uploader.recordedUploads()
+        XCTAssertEqual(uploads.count, 1)
+        XCTAssertTrue(store.hasDeveloperAnalyticsConsentDecision)
+        XCTAssertTrue(store.developerAnalyticsEnabled)
+    }
+
+    func testDisablingDeveloperAnalyticsDeletesUploadedSnapshot() async {
+        let uploader = RecordingDeveloperSnapshotUploader()
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        defaults.set(true, forKey: "developerAnalyticsEnabled")
+        let store = ChecklistStore(
+            storage: MemoryChecklistStorage(),
+            legacyData: nil,
+            locale: Locale(identifier: "en"),
+            userDefaults: defaults,
+            developerSnapshotUploader: uploader
+        )
+
+        await store.startSyncServices()
+        await store.setDeveloperAnalyticsEnabled(false)
+
+        XCTAssertFalse(store.developerAnalyticsEnabled)
+        XCTAssertEqual(defaults.object(forKey: "developerAnalyticsEnabled") as? Bool, false)
+        let deletionCount = await uploader.recordedDeletionCount()
+        XCTAssertEqual(deletionCount, 1)
     }
 }

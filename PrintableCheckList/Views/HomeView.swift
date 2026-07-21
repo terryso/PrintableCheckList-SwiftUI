@@ -73,6 +73,28 @@ struct HomeView: View {
             }
         }
         .alert(
+            Text("Help Improve Flash"),
+            isPresented: Binding(
+                get: { store.shouldRequestDeveloperAnalyticsConsent },
+                set: { _ in }
+            )
+        ) {
+            Button("Not Now", role: .cancel) {
+                Task {
+                    await store.setDeveloperAnalyticsEnabled(false)
+                }
+            }
+            Button("Share Data") {
+                Task {
+                    await store.setDeveloperAnalyticsEnabled(true)
+                }
+            }
+        } message: {
+            Text(
+                "With your permission, Flash sends your checklist text and an anonymous installation identifier to the developer to understand how the app is used. You can change this later in Settings."
+            )
+        }
+        .alert(
             Text("Unable to save changes"),
             isPresented: Binding(
                 get: { store.persistenceError != nil },

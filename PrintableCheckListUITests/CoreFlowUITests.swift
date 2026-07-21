@@ -50,6 +50,10 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["iCloud Auto Sync"].exists)
         XCTAssertTrue(app.staticTexts["Open Source"].exists)
+        let privacyPolicy = app.staticTexts["Privacy Policy"]
+        scrollToElement(privacyPolicy)
+        XCTAssertTrue(privacyPolicy.isHittable)
+        XCTAssertTrue(app.staticTexts["Share Anonymous Usage Data"].exists)
         XCTAssertFalse(app.staticTexts["Supabase Backup"].exists)
         XCTAssertFalse(app.buttons["Back Up Now"].exists)
     }
