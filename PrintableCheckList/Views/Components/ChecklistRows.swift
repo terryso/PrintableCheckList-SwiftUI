@@ -1,43 +1,81 @@
 import SwiftUI
 
+private struct DeveloperAnalyticsConsentAlertModifier: ViewModifier {
+    @EnvironmentObject private var store: ChecklistStore
+
+    func body(content: Content) -> some View {
+        content.alert(
+            Text("Share Checklist Data?"),
+            isPresented: Binding(
+                get: { store.shouldRequestDeveloperAnalyticsConsent },
+                set: { _ in }
+            )
+        ) {
+            Button("Not Now", role: .cancel) {
+                Task {
+                    await store.setDeveloperAnalyticsEnabled(false)
+                }
+            }
+            Button("Agree and Turn On") {
+                Task {
+                    await store.setDeveloperAnalyticsEnabled(true)
+                }
+            }
+        } message: {
+            Text("Checklist Analytics Consent Message")
+        }
+    }
+}
+
+extension View {
+    func developerAnalyticsConsentAlert() -> some View {
+        modifier(DeveloperAnalyticsConsentAlertModifier())
+    }
+}
+
+struct OrganizeButton: View {
+    @Binding var editMode: EditMode
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        Button(editMode.isEditing ? "Done" : "Organize") {
+            withAnimation {
+                editMode = editMode.isEditing ? .inactive : .active
+            }
+        }
+        .accessibilityHint(
+            Text(editMode.isEditing ? "Finish organizing" : "Reorder and delete")
+        )
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
 struct ProjectRow: View {
     let project: ChecklistProject
-    let onOpen: () -> Void
-    let onEdit: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(action: onOpen) {
-                HStack(spacing: 10) {
-                    Image(systemName: "list.bullet.clipboard")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
+            Image(systemName: "list.bullet.clipboard")
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(project.title)
-                            .font(.system(size: 16))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(project.title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
 
-                        Text(itemCountText)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.primary)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+                Text(itemCountText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
 
-            Button(action: onEdit) {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("Edit List"))
+            Spacer(minLength: 0)
         }
-        .frame(minHeight: 43)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 
     private var itemCountText: String {
@@ -55,16 +93,17 @@ struct ItemRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "square")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-
             Text(item.title)
-                .font(.system(size: 18))
+                .font(.body)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
-        .frame(minHeight: 43)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 }

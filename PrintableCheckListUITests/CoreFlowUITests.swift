@@ -5,106 +5,125 @@ final class CoreFlowUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments = [
-            "-resetForUITests",
-            "-AppleLanguages", "(en)",
-            "-AppleLocale", "en_US",
-        ]
+        app = makeApp()
         app.launch()
     }
 
-    func testAddItemsPreviewAndOpenSettings() {
+    func testCreateCompleteListEditPreviewAndOpenSettings() {
         XCTAssertTrue(app.navigationBars["Lists"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Travel Checklist"].exists)
+        XCTAssertFalse(app.alerts["Share Checklist Data?"].exists)
 
-        app.staticTexts["Travel Checklist"].tap()
-        XCTAssertTrue(app.navigationBars["Travel Checklist"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Passport"].exists)
+        app.buttons["newListButton"].tap()
+        XCTAssertTrue(app.navigationBars["New List"].waitForExistence(timeout: 3))
 
-        app.buttons["New Item"].tap()
-        XCTAssertTrue(app.navigationBars["New Item"].waitForExistence(timeout: 3))
-        let editor = app.textViews.firstMatch
-        XCTAssertTrue(editor.waitForExistence(timeout: 2))
-        editor.typeText("Camera\nPhone charger")
-        app.buttons["Save"].tap()
+        let nameField = app.textFields["newProjectNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.typeText("Weekend Shopping")
 
-        let camera = app.staticTexts["Camera"]
-        scrollToElement(camera)
-        XCTAssertTrue(camera.isHittable)
+        let initialItemsEditor = app.textViews["newProjectItemsEditor"]
+        XCTAssertTrue(initialItemsEditor.waitForExistence(timeout: 2))
+        initialItemsEditor.tap()
+        initialItemsEditor.typeText("Milk\nEggs")
+        app.buttons["createProjectButton"].tap()
 
-        let phoneCharger = app.staticTexts["Phone charger"]
-        scrollToElement(phoneCharger)
-        XCTAssertTrue(phoneCharger.isHittable)
+        XCTAssertTrue(app.navigationBars["Weekend Shopping"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Milk"].exists)
+        XCTAssertTrue(app.buttons["Eggs"].exists)
+        XCTAssertTrue(app.buttons["addItemsButton"].exists)
+        XCTAssertTrue(app.buttons["previewButton"].exists)
+        XCTAssertTrue(app.buttons["printButton"].exists)
+        XCTAssertFalse(app.images["square"].exists)
 
-        app.buttons["Actions"].tap()
-        let preview = app.buttons["Preview"].firstMatch
-        XCTAssertTrue(preview.waitForExistence(timeout: 2))
-        preview.tap()
+        app.buttons["Milk"].tap()
+        let editField = app.textFields["singleLineEditorField"]
+        XCTAssertTrue(editField.waitForExistence(timeout: 2))
+        editField.tap()
+        editField.press(forDuration: 1)
+        app.menuItems["Select All"].tap()
+        editField.typeText("Oat Milk")
+        app.buttons["singleLineEditorSaveButton"].tap()
+        XCTAssertTrue(app.buttons["Oat Milk"].waitForExistence(timeout: 2))
+
+        app.buttons["previewButton"].tap()
         XCTAssertTrue(app.navigationBars["Preview"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Camera"].exists)
+        XCTAssertTrue(app.staticTexts["Oat Milk"].exists)
+        XCTAssertTrue(app.buttons["previewPrintButton"].exists)
 
         app.navigationBars["Preview"].buttons.firstMatch.tap()
-        app.navigationBars["Travel Checklist"].buttons.firstMatch.tap()
-        app.buttons["Settings"].tap()
+        app.navigationBars["Weekend Shopping"].buttons.firstMatch.tap()
+        app.buttons["settingsButton"].tap()
 
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["iCloud Auto Sync"].exists)
-        XCTAssertTrue(app.staticTexts["Open Source"].exists)
-        let privacyPolicy = app.staticTexts["Privacy Policy"]
-        scrollToElement(privacyPolicy)
-        XCTAssertTrue(privacyPolicy.isHittable)
-        XCTAssertTrue(app.staticTexts["Share Anonymous Usage Data"].exists)
-        XCTAssertFalse(app.staticTexts["Supabase Backup"].exists)
-        XCTAssertFalse(app.buttons["Back Up Now"].exists)
+        XCTAssertTrue(app.staticTexts["Sync"].exists)
+        XCTAssertTrue(app.staticTexts["Privacy"].exists)
+        XCTAssertTrue(app.staticTexts["Support & About"].exists)
+        XCTAssertTrue(app.staticTexts["Share Checklist Content for Product Analytics"].exists)
+        XCTAssertFalse(app.staticTexts["Share Anonymous Usage Data"].exists)
     }
 
-    func testActionsMenuStaysAnchoredAfterReturningFromPreview() {
-        XCTAssertTrue(app.navigationBars["Lists"].waitForExistence(timeout: 5))
+    func testEmptyListGuidesUserToAddItems() {
+        app.buttons["newListButton"].tap()
+        let nameField = app.textFields["newProjectNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.typeText("Ideas")
+        app.buttons["createProjectButton"].tap()
 
+        XCTAssertTrue(app.navigationBars["Ideas"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No Items Yet"].exists)
+        XCTAssertTrue(app.buttons["Add Items"].exists)
+
+        app.buttons["emptyAddItemsButton"].tap()
+        let editor = app.textViews["addItemsEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 2))
+        editor.typeText("First idea\n\nSecond idea")
+        app.buttons["addItemsSaveButton"].tap()
+
+        XCTAssertTrue(app.buttons["First idea"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Second idea"].exists)
+    }
+
+    func testSwipeActionsExposeEditAndDelete() {
         app.staticTexts["Travel Checklist"].tap()
         XCTAssertTrue(app.navigationBars["Travel Checklist"].waitForExistence(timeout: 3))
 
-        let actions = app.buttons["Actions"]
-        XCTAssertTrue(actions.waitForExistence(timeout: 2))
-        actions.tap()
-
-        let preview = app.buttons["Preview"].firstMatch
-        XCTAssertTrue(preview.waitForExistence(timeout: 2))
-        assertMenu(preview, isAnchoredTo: actions)
-        preview.tap()
-
-        XCTAssertTrue(app.navigationBars["Preview"].waitForExistence(timeout: 3))
-        app.navigationBars["Preview"].buttons.firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Travel Checklist"].waitForExistence(timeout: 3))
-
-        actions.tap()
-        XCTAssertTrue(preview.waitForExistence(timeout: 2))
-        assertMenu(preview, isAnchoredTo: actions)
+        let passport = app.buttons["Passport"]
+        XCTAssertTrue(passport.waitForExistence(timeout: 2))
+        passport.swipeLeft()
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Delete"].exists)
+        app.buttons["Edit"].tap()
+        XCTAssertTrue(app.textFields["singleLineEditorField"].waitForExistence(timeout: 2))
     }
 
-    private func assertMenu(
-        _ menuItem: XCUIElement,
-        isAnchoredTo source: XCUIElement,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let verticalDistance = abs(source.frame.midY - menuItem.frame.midY)
-        XCTAssertLessThan(
-            verticalDistance,
-            250,
-            "The actions menu should remain anchored to the bottom toolbar button.",
-            file: file,
-            line: line
-        )
+    func testAnalyticsConsentAppearsOnlyAfterAddingItems() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-enableAnalyticsConsentForUITests"])
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Lists"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.alerts["Share Checklist Data?"].exists)
+
+        app.staticTexts["Travel Checklist"].tap()
+        app.buttons["addItemsButton"].tap()
+        let editor = app.textViews["addItemsEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 2))
+        editor.typeText("Camera")
+        app.buttons["addItemsSaveButton"].tap()
+
+        let consentAlert = app.alerts["Share Checklist Data?"]
+        XCTAssertTrue(consentAlert.waitForExistence(timeout: 3))
+        XCTAssertTrue(consentAlert.buttons["Agree and Turn On"].exists)
+        consentAlert.buttons["Not Now"].tap()
+        XCTAssertFalse(consentAlert.exists)
     }
 
-    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 10) {
-        for _ in 0..<maxSwipes {
-            if element.exists && element.isHittable {
-                return
-            }
-            app.swipeUp()
-        }
+    private func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
+        let application = XCUIApplication()
+        application.launchArguments = [
+            "-resetForUITests",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ] + additionalArguments
+        return application
     }
 }

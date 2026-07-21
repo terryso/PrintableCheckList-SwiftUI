@@ -8,6 +8,7 @@ final class ChecklistStore: ObservableObject {
     @Published private(set) var iCloudSyncEnabled: Bool
     @Published private(set) var developerAnalyticsEnabled: Bool
     @Published private(set) var hasDeveloperAnalyticsConsentDecision: Bool
+    @Published private(set) var developerAnalyticsConsentOpportunityReached = false
     @Published private(set) var developerAnalyticsError: String?
 
     private let storage: ChecklistStorage
@@ -70,19 +71,28 @@ final class ChecklistStore: ObservableObject {
     }
 
     var shouldRequestDeveloperAnalyticsConsent: Bool {
-        developerAnalyticsAvailable && !hasDeveloperAnalyticsConsentDecision
+        developerAnalyticsAvailable
+            && developerAnalyticsConsentOpportunityReached
+            && !hasDeveloperAnalyticsConsentDecision
+    }
+
+    func markDeveloperAnalyticsConsentOpportunity() {
+        guard !hasDeveloperAnalyticsConsentDecision else { return }
+        developerAnalyticsConsentOpportunityReached = true
     }
 
     func setDeveloperAnalyticsEnabled(_ enabled: Bool) async {
+        let wasEnabled = developerAnalyticsEnabled
         developerAnalyticsEnabled = enabled
         hasDeveloperAnalyticsConsentDecision = true
+        developerAnalyticsConsentOpportunityReached = false
         developerAnalyticsError = nil
         userDefaults.set(enabled, forKey: Self.developerAnalyticsEnabledKey)
         userDefaults.removeObject(forKey: Self.developerSnapshotLastUploadKey)
 
         if enabled {
             await uploadDeveloperSnapshotIfDue()
-        } else {
+        } else if wasEnabled {
             await deleteDeveloperSnapshot()
         }
     }
@@ -121,15 +131,36 @@ final class ChecklistStore: ObservableObject {
         projects.first { $0.id == id }
     }
 
-    func addProject(title: String) {
-        projects.append(ChecklistProject(title: normalizedSingleLine(title)))
+    @discardableResult
+    func addProject(title: String, itemsText: String = "") -> UUID? {
+        let normalizedTitle = normalizedSingleLine(title)
+        guard !normalizedTitle.isEmpty else { return nil }
+
+        let itemTitles = normalizedItemTitles(from: itemsText)
+        let project = ChecklistProject(
+            title: normalizedTitle,
+            items: itemTitles.map { ChecklistItem(title: $0) }
+        )
+        projects.append(project)
         persist()
+        if !itemTitles.isEmpty {
+            markDeveloperAnalyticsConsentOpportunity()
+        }
+        return project.id
     }
 
     func renameProject(id: UUID, title: String) {
+        let normalizedTitle = normalizedSingleLine(title)
+        guard !normalizedTitle.isEmpty else { return }
         mutateProject(id: id) { project in
-            project.title = normalizedSingleLine(title)
+            project.title = normalizedTitle
         }
+    }
+
+    func deleteProject(id: UUID) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects.remove(at: index)
+        persist()
     }
 
     func deleteProjects(at offsets: IndexSet) {
@@ -142,19 +173,31 @@ final class ChecklistStore: ObservableObject {
         persist()
     }
 
-    func addItems(projectID: UUID, text: String) {
-        let titles = text.components(separatedBy: .newlines)
+    @discardableResult
+    func addItems(projectID: UUID, text: String) -> Int {
+        let titles = normalizedItemTitles(from: text)
+        guard !titles.isEmpty else { return 0 }
         mutateProject(id: projectID) { project in
             project.items.append(contentsOf: titles.map { ChecklistItem(title: $0) })
         }
+        markDeveloperAnalyticsConsentOpportunity()
+        return titles.count
     }
 
     func renameItem(projectID: UUID, itemID: UUID, title: String) {
+        let normalizedTitle = normalizedSingleLine(title)
+        guard !normalizedTitle.isEmpty else { return }
         mutateProject(id: projectID) { project in
             guard let itemIndex = project.items.firstIndex(where: { $0.id == itemID }) else {
                 return
             }
-            project.items[itemIndex].title = normalizedSingleLine(title)
+            project.items[itemIndex].title = normalizedTitle
+        }
+    }
+
+    func deleteItem(projectID: UUID, itemID: UUID) {
+        mutateProject(id: projectID) { project in
+            project.items.removeAll { $0.id == itemID }
         }
     }
 
@@ -270,9 +313,17 @@ final class ChecklistStore: ObservableObject {
 
     private func normalizedSingleLine(_ text: String) -> String {
         text
-            .trimmingCharacters(in: .newlines)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\r", with: "")
             .replacingOccurrences(of: "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedItemTitles(from text: String) -> [String] {
+        text
+            .components(separatedBy: .newlines)
+            .map { normalizedSingleLine($0) }
+            .filter { !$0.isEmpty }
     }
 
     private static let iCloudEnabledKey = "keyEnableAutoSync"

@@ -10,11 +10,20 @@ struct PrintableCheckListApp: App {
             let testFileURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PrintableCheckList-UITests.json")
             try? FileManager.default.removeItem(at: testFileURL)
+            let testDefaultsSuite = "PrintableCheckList-UITests"
+            let testDefaults = UserDefaults(suiteName: testDefaultsSuite)!
+            testDefaults.removePersistentDomain(forName: testDefaultsSuite)
+            let testAnalyticsUploader: (any DeveloperSnapshotUploading)? =
+                ProcessInfo.processInfo.arguments.contains(
+                    "-enableAnalyticsConsentForUITests"
+                ) ? UITestDeveloperSnapshotUploader() : nil
             _store = StateObject(
                 wrappedValue: ChecklistStore(
                     storage: FileChecklistStorage(fileURL: testFileURL),
                     legacyData: nil,
-                    locale: Locale(identifier: "en")
+                    locale: Locale(identifier: "en"),
+                    userDefaults: testDefaults,
+                    developerSnapshotUploader: testAnalyticsUploader
                 )
             )
             return
@@ -44,3 +53,10 @@ struct PrintableCheckListApp: App {
         }
     }
 }
+
+#if DEBUG
+private actor UITestDeveloperSnapshotUploader: DeveloperSnapshotUploading {
+    func upload(_ projects: [ChecklistProject]) async throws {}
+    func deleteSnapshot() async throws {}
+}
+#endif

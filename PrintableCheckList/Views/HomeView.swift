@@ -9,45 +9,48 @@ struct HomeView: View {
     @EnvironmentObject private var store: ChecklistStore
 
     @State private var path: [AppRoute] = []
+    @State private var editMode: EditMode = .inactive
     @State private var showsNewProject = false
     @State private var projectBeingEdited: ChecklistProject?
+    @State private var pendingCreatedProjectID: UUID?
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                ForEach(store.projects) { project in
-                    ProjectRow(
-                        project: project,
-                        onOpen: { path.append(.items(project.id)) },
-                        onEdit: { projectBeingEdited = project }
-                    )
+            Group {
+                if store.projects.isEmpty {
+                    emptyState
+                } else {
+                    projectList
                 }
-                .onDelete(perform: store.deleteProjects)
-                .onMove(perform: store.moveProjects)
             }
-            .listStyle(.plain)
             .navigationTitle(Text("Lists"))
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    EditButton()
+                if !store.projects.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        OrganizeButton(
+                            editMode: $editMode,
+                            accessibilityIdentifier: "organizeListsButton"
+                        )
+                    }
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
                     Button {
                         showsNewProject = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label("New List", systemImage: "plus")
                     }
-                    .accessibilityLabel(Text("New List"))
+                    .accessibilityHint(Text("Create a list and optionally add its first items"))
+                    .accessibilityIdentifier("newListButton")
 
                     Spacer()
 
                     Button {
                         path.append(.settings)
                     } label: {
-                        Image(systemName: "gearshape")
+                        Label("Settings", systemImage: "gearshape")
                     }
-                    .accessibilityLabel(Text("Settings"))
+                    .accessibilityIdentifier("settingsButton")
                 }
             }
             .navigationDestination(for: AppRoute.self) { route in
@@ -59,40 +62,26 @@ struct HomeView: View {
                 }
             }
         }
-        .sheet(isPresented: $showsNewProject) {
-            TextEditorSheet(title: String(localized: "New List")) { text in
-                store.addProject(title: text)
+        .sheet(
+            isPresented: $showsNewProject,
+            onDismiss: openPendingProject
+        ) {
+            NewProjectSheet { title, itemsText in
+                pendingCreatedProjectID = store.addProject(
+                    title: title,
+                    itemsText: itemsText
+                )
             }
         }
         .sheet(item: $projectBeingEdited) { project in
-            TextEditorSheet(
+            SingleLineEditorSheet(
                 title: String(localized: "Edit List"),
-                initialText: project.title
+                fieldLabel: String(localized: "List Name"),
+                initialText: project.title,
+                placeholder: String(localized: "Example: Travel Checklist")
             ) { text in
                 store.renameProject(id: project.id, title: text)
             }
-        }
-        .alert(
-            Text("Help Improve Flash"),
-            isPresented: Binding(
-                get: { store.shouldRequestDeveloperAnalyticsConsent },
-                set: { _ in }
-            )
-        ) {
-            Button("Not Now", role: .cancel) {
-                Task {
-                    await store.setDeveloperAnalyticsEnabled(false)
-                }
-            }
-            Button("Share Data") {
-                Task {
-                    await store.setDeveloperAnalyticsEnabled(true)
-                }
-            }
-        } message: {
-            Text(
-                "With your permission, Flash sends your checklist text and an anonymous installation identifier to the developer to understand how the app is used. You can change this later in Settings."
-            )
         }
         .alert(
             Text("Unable to save changes"),
@@ -109,5 +98,69 @@ struct HomeView: View {
         } message: {
             Text(store.persistenceError ?? "")
         }
+    }
+
+    private var projectList: some View {
+        List {
+            ForEach(store.projects) { project in
+                NavigationLink(value: AppRoute.items(project.id)) {
+                    ProjectRow(project: project)
+                }
+                .accessibilityHint(Text("Open List"))
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        store.deleteProject(id: project.id)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+
+                    Button {
+                        projectBeingEdited = project
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+                .contextMenu {
+                    Button {
+                        projectBeingEdited = project
+                    } label: {
+                        Label("Edit List", systemImage: "pencil")
+                    }
+
+                    Button(role: .destructive) {
+                        store.deleteProject(id: project.id)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+            .onDelete(perform: store.deleteProjects)
+            .onMove(perform: store.moveProjects)
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, $editMode)
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Lists Yet", systemImage: "list.bullet.clipboard")
+        } description: {
+            Text("Start by creating a list you can preview and print.")
+        } actions: {
+            Button {
+                showsNewProject = true
+            } label: {
+                Label("Create Your First List", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("emptyCreateListButton")
+        }
+    }
+
+    private func openPendingProject() {
+        guard let projectID = pendingCreatedProjectID else { return }
+        pendingCreatedProjectID = nil
+        path.append(.items(projectID))
     }
 }

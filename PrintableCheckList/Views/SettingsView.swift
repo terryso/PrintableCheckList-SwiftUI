@@ -8,39 +8,12 @@ struct SettingsView: View {
     @State private var showsShareSheet = false
     @State private var showsMailComposer = false
     @State private var showsMailUnavailable = false
+    @State private var showsAnalyticsConsent = false
     @State private var showsDeleteAnalyticsConfirmation = false
 
     var body: some View {
         List {
-            Section("SHARE") {
-                settingsButton("Tell friends") {
-                    showsShareSheet = true
-                }
-            }
-
-            Section("FEEDBACK") {
-                settingsButton("Rate in AppStore") {
-                    openURL(URL(string: "https://itunes.apple.com/us/app/id991595690?mt=8")!)
-                }
-
-                settingsButton("Email to support") {
-                    if MFMailComposeViewController.canSendMail() {
-                        showsMailComposer = true
-                    } else {
-                        showsMailUnavailable = true
-                    }
-                }
-
-                settingsButton("Follow us on Twitter") {
-                    openURL(URL(string: "https://twitter.com/suchuanyi")!)
-                }
-
-                settingsButton("Open Source") {
-                    openURL(URL(string: "https://github.com/terryso/PrintableCheckList")!)
-                }
-            }
-
-            Section("SYNC") {
+            Section {
                 Toggle(
                     "iCloud Sync",
                     isOn: Binding(
@@ -48,21 +21,21 @@ struct SettingsView: View {
                         set: store.setICloudSyncEnabled
                     )
                 )
+                .accessibilityHint(Text("Sync checklists between devices signed in to iCloud"))
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text("iCloud sync keeps your lists available on your Apple devices.")
             }
 
             Section {
                 Toggle(
-                    "Share Anonymous Usage Data",
-                    isOn: Binding(
-                        get: { store.developerAnalyticsEnabled },
-                        set: { enabled in
-                            Task {
-                                await store.setDeveloperAnalyticsEnabled(enabled)
-                            }
-                        }
-                    )
+                    "Share Checklist Content for Product Analytics",
+                    isOn: analyticsToggleBinding
                 )
                 .disabled(!store.developerAnalyticsAvailable)
+                .accessibilityHint(Text("Share checklist content only after you explicitly agree"))
+                .accessibilityIdentifier("analyticsSharingToggle")
 
                 Button("Delete Shared Analytics Data", role: .destructive) {
                     showsDeleteAnalyticsConfirmation = true
@@ -77,21 +50,48 @@ struct SettingsView: View {
                     )
                 }
             } header: {
-                Text("PRIVACY")
+                Text("Privacy")
             } footer: {
-                Text(
-                    "When enabled, your checklist text and an anonymous installation identifier are shared with the developer for product analytics. This is separate from iCloud Sync."
-                )
+                Text("Checklist Analytics Settings Footer")
+            }
+
+            Section {
+                settingsButton("Tell friends") {
+                    showsShareSheet = true
+                }
+
+                settingsButton("Rate in AppStore") {
+                    openURL(URL(string: "https://itunes.apple.com/us/app/id991595690?mt=8")!)
+                }
+
+                settingsButton("Email to support") {
+                    if MFMailComposeViewController.canSendMail() {
+                        showsMailComposer = true
+                    } else {
+                        showsMailUnavailable = true
+                    }
+                }
+
+                settingsButton("Follow us on X") {
+                    openURL(URL(string: "https://x.com/suchuanyi")!)
+                }
+
+                settingsButton("Open Source") {
+                    openURL(URL(string: "https://github.com/terryso/PrintableCheckList-SwiftUI")!)
+                }
+            } header: {
+                Text("Support & About")
             }
 
             Section {
                 EmptyView()
             } footer: {
                 Text(versionText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color(white: 0.76))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .textCase(nil)
+                    .accessibilityLabel(Text("Version \(versionText)"))
             }
         }
         .navigationTitle(Text("Settings"))
@@ -110,6 +110,19 @@ struct SettingsView: View {
             isPresented: $showsMailUnavailable
         ) {
             Button("Confirm", role: .cancel) {}
+        }
+        .alert(
+            Text("Share Checklist Data?"),
+            isPresented: $showsAnalyticsConsent
+        ) {
+            Button("Not Now", role: .cancel) {}
+            Button("Agree and Turn On") {
+                Task {
+                    await store.setDeveloperAnalyticsEnabled(true)
+                }
+            }
+        } message: {
+            Text("Checklist Analytics Consent Message")
         }
         .confirmationDialog(
             Text("Delete Shared Analytics Data?"),
@@ -144,6 +157,21 @@ struct SettingsView: View {
         }
     }
 
+    private var analyticsToggleBinding: Binding<Bool> {
+        Binding(
+            get: { store.developerAnalyticsEnabled },
+            set: { enabled in
+                if enabled {
+                    showsAnalyticsConsent = true
+                } else {
+                    Task {
+                        await store.setDeveloperAnalyticsEnabled(false)
+                    }
+                }
+            }
+        )
+    }
+
     private func settingsButton(
         _ titleKey: LocalizedStringKey,
         action: @escaping () -> Void
@@ -156,8 +184,12 @@ struct SettingsView: View {
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var shareText: String {
@@ -177,7 +209,6 @@ struct SettingsView: View {
         let build = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion"
         ) as? String ?? "-"
-        return "\(version)-\(build)(appstore)"
+        return "\(version) (\(build))"
     }
-
 }

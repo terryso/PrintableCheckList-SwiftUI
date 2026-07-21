@@ -117,6 +117,45 @@ final class ChecklistStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.project(id: project.id)?.items.map(\.title), ["Second", "First"])
     }
 
+    func testCombinedProjectCreationNormalizesTextAndIgnoresBlankItems() throws {
+        let storage = MemoryChecklistStorage()
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        let store = ChecklistStore(
+            storage: storage,
+            legacyData: nil,
+            locale: Locale(identifier: "en"),
+            userDefaults: defaults
+        )
+
+        let projectID = try XCTUnwrap(
+            store.addProject(
+                title: "  Weekend Shopping  \n",
+                itemsText: "  Milk  \n\n   \n Eggs \r\n"
+            )
+        )
+        let project = try XCTUnwrap(store.project(id: projectID))
+
+        XCTAssertEqual(project.title, "Weekend Shopping")
+        XCTAssertEqual(project.items.map(\.title), ["Milk", "Eggs"])
+        XCTAssertTrue(store.developerAnalyticsConsentOpportunityReached)
+    }
+
+    func testBlankProjectAndItemsAreRejected() throws {
+        let store = ChecklistStore(
+            storage: MemoryChecklistStorage(),
+            legacyData: nil,
+            locale: Locale(identifier: "en")
+        )
+
+        XCTAssertNil(store.addProject(title: " \n ", itemsText: "Ignored"))
+        let projectID = try XCTUnwrap(store.projects.first?.id)
+        let originalItems = try XCTUnwrap(store.project(id: projectID)?.items)
+
+        XCTAssertEqual(store.addItems(projectID: projectID, text: "\n  \n"), 0)
+        XCTAssertEqual(store.project(id: projectID)?.items, originalItems)
+        XCTAssertFalse(store.developerAnalyticsConsentOpportunityReached)
+    }
+
     func testMigratesLegacyObjectiveCArchive() throws {
         let item = LegacyItemArchive()
         item.itemID = "1430671974.453793"
@@ -263,18 +302,42 @@ final class ChecklistStoreTests: XCTestCase {
             developerSnapshotUploader: uploader
         )
 
-        XCTAssertTrue(store.shouldRequestDeveloperAnalyticsConsent)
+        XCTAssertFalse(store.shouldRequestDeveloperAnalyticsConsent)
         XCTAssertFalse(store.developerAnalyticsEnabled)
 
         await store.startSyncServices()
         var uploads = await uploader.recordedUploads()
         XCTAssertTrue(uploads.isEmpty)
 
+        let projectID = store.projects[0].id
+        store.addItems(projectID: projectID, text: "Camera")
+        XCTAssertTrue(store.shouldRequestDeveloperAnalyticsConsent)
+
         await store.setDeveloperAnalyticsEnabled(true)
         uploads = await uploader.recordedUploads()
         XCTAssertEqual(uploads.count, 1)
         XCTAssertTrue(store.hasDeveloperAnalyticsConsentDecision)
         XCTAssertTrue(store.developerAnalyticsEnabled)
+    }
+
+    func testDecliningInitialAnalyticsConsentDoesNotDeleteRemoteData() async {
+        let uploader = RecordingDeveloperSnapshotUploader()
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        let store = ChecklistStore(
+            storage: MemoryChecklistStorage(),
+            legacyData: nil,
+            locale: Locale(identifier: "en"),
+            userDefaults: defaults,
+            developerSnapshotUploader: uploader
+        )
+
+        store.addItems(projectID: store.projects[0].id, text: "Camera")
+        await store.setDeveloperAnalyticsEnabled(false)
+
+        XCTAssertFalse(store.shouldRequestDeveloperAnalyticsConsent)
+        XCTAssertFalse(store.developerAnalyticsEnabled)
+        let deletionCount = await uploader.recordedDeletionCount()
+        XCTAssertEqual(deletionCount, 0)
     }
 
     func testDisablingDeveloperAnalyticsDeletesUploadedSnapshot() async {

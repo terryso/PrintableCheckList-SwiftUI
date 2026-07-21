@@ -13,11 +13,11 @@ enum PrintHTMLBuilder {
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: -apple-system, sans-serif; }
-            h1 { font-size: 32px; }
-            .item { min-height: 30px; font-size: 16px; line-height: 30px; padding-left: 35px; margin-bottom: 15px; }
+            body { font-family: -apple-system, sans-serif; margin: 0; }
+            h1 { font-size: 32px; line-height: 40px; margin: 0 0 18px 0; }
+            .item { min-height: 28px; font-size: 16px; line-height: 28px; padding-left: 35px; margin-bottom: 12px; }
             .item:last-child { margin-bottom: 0; }
-            .checkbox { box-sizing: border-box; display: block; float: left; width: 20px; height: 20px; border: 2px solid black; margin: 5px 20px 0 0; }
+            .checkbox { box-sizing: border-box; display: block; float: left; width: 20px; height: 20px; border: 2px solid black; margin: 4px 20px 0 0; }
           </style>
         </head>
         <body><h1>\(escape(project.title))</h1>\(rows)</body>
@@ -45,8 +45,12 @@ enum PrintService {
         return formatter
     }
 
-    static func present(project: ChecklistProject) {
+    static func present(
+        project: ChecklistProject,
+        completion: @escaping (Bool) -> Void = { _ in }
+    ) {
         guard UIPrintInteractionController.isPrintingAvailable else {
+            completion(false)
             return
         }
 
@@ -60,12 +64,25 @@ enum PrintService {
 
         controller.printFormatter = printFormatter(for: project)
 
+        let completionHandler: UIPrintInteractionController.CompletionHandler = {
+            _, completed, error in
+            completion(completed && error == nil)
+        }
+
         if UIDevice.current.userInterfaceIdiom == .pad,
            let view = topViewController(from: rootViewController())?.view {
             let sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
-            controller.present(from: sourceRect, in: view, animated: true)
+            controller.present(
+                from: sourceRect,
+                in: view,
+                animated: true,
+                completionHandler: completionHandler
+            )
         } else {
-            controller.present(animated: true)
+            controller.present(
+                animated: true,
+                completionHandler: completionHandler
+            )
         }
     }
 
