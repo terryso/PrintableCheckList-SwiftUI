@@ -6,7 +6,6 @@ struct ItemsView: View {
     @EnvironmentObject private var store: ChecklistStore
     @State private var showsNewItems = false
     @State private var itemBeingEdited: ChecklistItem?
-    @State private var showsActions = false
     @State private var showsPreview = false
 
     var body: some View {
@@ -49,26 +48,12 @@ struct ItemsView: View {
 
                         Spacer()
 
-                        Button {
-                            showsActions = true
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
+                        ActionsToolbarButton {
+                            PrintService.present(project: project)
+                        } previewAction: {
+                            showsPreview = true
                         }
-                        .accessibilityLabel(Text("Actions"))
                     }
-                }
-                .confirmationDialog(
-                    "",
-                    isPresented: $showsActions,
-                    titleVisibility: .hidden
-                ) {
-                    Button(String(localized: "Print")) {
-                        PrintService.present(project: project)
-                    }
-                    Button(String(localized: "Preview")) {
-                        showsPreview = true
-                    }
-                    Button(String(localized: "Cancel"), role: .cancel) {}
                 }
                 .navigationDestination(isPresented: $showsPreview) {
                     PreviewView(projectID: projectID)
@@ -95,6 +80,41 @@ struct ItemsView: View {
             ) { text in
                 store.renameItem(projectID: projectID, itemID: item.id, title: text)
             }
+        }
+    }
+}
+
+private struct ActionsToolbarButton: View {
+    let printAction: () -> Void
+    let previewAction: () -> Void
+
+    @State private var showsActions = false
+
+    var body: some View {
+        Button {
+            showsActions = true
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel(Text("Actions"))
+        .confirmationDialog(
+            "",
+            isPresented: $showsActions,
+            titleVisibility: .hidden
+        ) {
+            Button {
+                printAction()
+            } label: {
+                Label(String(localized: "Print"), systemImage: "printer")
+            }
+
+            Button {
+                previewAction()
+            } label: {
+                Label(String(localized: "Preview"), systemImage: "doc.text.magnifyingglass")
+            }
+
+            Button(String(localized: "Cancel"), role: .cancel) {}
         }
     }
 }

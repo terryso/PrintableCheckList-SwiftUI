@@ -16,6 +16,7 @@ enum PrintHTMLBuilder {
             body { font-family: -apple-system, sans-serif; }
             h1 { font-size: 32px; }
             .item { min-height: 30px; font-size: 16px; line-height: 30px; padding-left: 35px; margin-bottom: 15px; }
+            .item:last-child { margin-bottom: 0; }
             .checkbox { box-sizing: border-box; display: block; float: left; width: 20px; height: 20px; border: 2px solid black; margin: 5px 20px 0 0; }
           </style>
         </head>
@@ -36,6 +37,14 @@ enum PrintHTMLBuilder {
 
 @MainActor
 enum PrintService {
+    static func printFormatter(for project: ChecklistProject) -> UIPrintFormatter {
+        let formatter = UIMarkupTextPrintFormatter(
+            markupText: PrintHTMLBuilder.html(for: project)
+        )
+        formatter.perPageContentInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        return formatter
+    }
+
     static func present(project: ChecklistProject) {
         guard UIPrintInteractionController.isPrintingAvailable else {
             return
@@ -49,11 +58,7 @@ enum PrintService {
         controller.printInfo = printInfo
         controller.showsPageRange = false
 
-        let formatter = UIMarkupTextPrintFormatter(
-            markupText: PrintHTMLBuilder.html(for: project)
-        )
-        formatter.contentInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-        controller.printFormatter = formatter
+        controller.printFormatter = printFormatter(for: project)
 
         if UIDevice.current.userInterfaceIdiom == .pad,
            let view = topViewController(from: rootViewController())?.view {

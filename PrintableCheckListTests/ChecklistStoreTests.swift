@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import XCTest
 @testable import PrintableCheckList
 
@@ -153,6 +154,16 @@ final class ChecklistStoreTests: XCTestCase {
         XCTAssertTrue(html.contains("Travel &amp; Work"))
         XCTAssertTrue(html.contains("Passport &lt;required&gt;"))
         XCTAssertTrue(html.contains("class=\"checkbox\""))
+    }
+
+    func testDefaultChineseChecklistPrintsOnSingleA4Page() {
+        let formatter = PrintService.printFormatter(for: DefaultContent.chineseTravelChecklist)
+        let renderer = UIPrintPageRenderer()
+        renderer.setValue(CGRect(x: 0, y: 0, width: 595.2, height: 842), forKey: "paperRect")
+        renderer.setValue(CGRect(x: 36, y: 36, width: 523.2, height: 770), forKey: "printableRect")
+        renderer.addPrintFormatter(formatter, startingAtPageAt: 0)
+
+        XCTAssertEqual(renderer.numberOfPages, 1)
     }
 
     func testDeveloperSnapshotUploadIsDisabledWithoutConfiguration() {
