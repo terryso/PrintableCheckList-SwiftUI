@@ -53,6 +53,18 @@ The payload contains user-entered list text. Enable this optional upload only
 after making an explicit product and privacy decision, and configure appropriate
 abuse controls for anonymous sign-ins. Otherwise leave the Supabase values empty.
 
+### Xcode Cloud
+
+Add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` to the workflow's Environment
+Variables. Mark the publishable key as secret to keep it redacted from build
+logs. Do not configure a `service_role` or `sb_secret_` key.
+
+Xcode Cloud runs `ci_scripts/ci_post_clone.sh` after cloning. The script writes
+the ignored `Config/Local.xcconfig`, installs XcodeGen with Homebrew when needed,
+and generates `PrintableCheckList.xcodeproj` from `project.yml`. The URL entered
+in Xcode Cloud must use its normal `https://` form; the script applies the
+escaping required by `.xcconfig` files.
+
 ## Configure signing and iCloud
 
 Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig`, then set

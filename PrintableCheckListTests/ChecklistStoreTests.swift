@@ -147,7 +147,12 @@ final class ChecklistStoreTests: XCTestCase {
     }
 
     func testDeveloperSnapshotUploadIsDisabledWithoutConfiguration() {
-        XCTAssertEqual(DeveloperSnapshotConfiguration.fromBundle(.main), .disabled)
+        let unconfiguredTestBundle = Bundle(for: ChecklistStoreTests.self)
+
+        XCTAssertEqual(
+            DeveloperSnapshotConfiguration.fromBundle(unconfiguredTestBundle),
+            .disabled
+        )
     }
 
     func testICloudSyncImportsLegacyDataBeforeWritingNewJSON() async throws {
