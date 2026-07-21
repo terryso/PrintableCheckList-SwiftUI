@@ -1,0 +1,11 @@
+// Copy this file to Local.xcconfig when a signed device build is needed.
+// Local.xcconfig is ignored by git.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Optional developer-managed checklist snapshot upload. These values belong in
+// the developer build configuration and are never entered by app users.
+// Use the Project URL and publishable key from Supabase's Connect panel.
+// Never put a service_role or secret key in an iOS app.
+// `$()` preserves the two slashes because xcconfig otherwise treats `//` as a comment.
+SUPABASE_URL = https:/$()/YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY =

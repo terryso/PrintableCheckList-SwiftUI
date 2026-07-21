@@ -1,0 +1,6 @@
+// Checked-in defaults. Local.xcconfig is optional and ignored by Git.
+DEVELOPMENT_TEAM =
+SUPABASE_URL =
+SUPABASE_PUBLISHABLE_KEY =
+
+#include? "Local.xcconfig"
