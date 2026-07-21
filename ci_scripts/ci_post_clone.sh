@@ -51,4 +51,16 @@ fi
 cd "$project_root"
 ./Scripts/generate.sh
 
-echo "Prepared the Xcode project and developer snapshot configuration."
+package_lock_source="$project_root/Config/Package.resolved"
+package_lock_directory="$project_root/PrintableCheckList.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+package_lock_destination="$package_lock_directory/Package.resolved"
+
+if [ ! -f "$package_lock_source" ]; then
+    echo "Missing the committed Swift package lock file at $package_lock_source." >&2
+    exit 1
+fi
+
+mkdir -p "$package_lock_directory"
+cp "$package_lock_source" "$package_lock_destination"
+
+echo "Prepared the Xcode project, package lock file, and developer snapshot configuration."
