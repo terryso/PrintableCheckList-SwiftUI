@@ -14,6 +14,7 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertFalse(app.alerts["Share Checklist Data?"].exists)
 
         app.buttons["newListButton"].tap()
+        app.buttons["Create Manually"].tap()
         XCTAssertTrue(app.navigationBars["New List"].waitForExistence(timeout: 3))
 
         let nameField = app.textFields["newProjectNameField"]
@@ -54,15 +55,28 @@ final class CoreFlowUITests: XCTestCase {
         app.buttons["settingsButton"].tap()
 
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Sync"].exists)
-        XCTAssertTrue(app.staticTexts["Privacy"].exists)
-        XCTAssertTrue(app.staticTexts["Support & About"].exists)
-        XCTAssertTrue(app.staticTexts["Share Checklist Content for Product Analytics"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["aiConfigurationLink"].exists)
         XCTAssertFalse(app.staticTexts["Share Anonymous Usage Data"].exists)
+    }
+
+    func testSettingsShowsShortVersionOnly() {
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
+
+        let settingsList = app.collectionViews["settingsList"]
+        XCTAssertTrue(settingsList.exists)
+        for _ in 0..<5 {
+            settingsList.swipeUp()
+        }
+        let versionText = app.staticTexts["appVersionText"]
+        XCTAssertTrue(versionText.waitForExistence(timeout: 2))
+        XCTAssertEqual(versionText.label, "Version 2.1.0")
+        XCTAssertFalse(versionText.label.contains("("))
     }
 
     func testEmptyListGuidesUserToAddItems() {
         app.buttons["newListButton"].tap()
+        app.buttons["Create Manually"].tap()
         let nameField = app.textFields["newProjectNameField"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 2))
         nameField.typeText("Ideas")
@@ -70,7 +84,7 @@ final class CoreFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["Ideas"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["No Items Yet"].exists)
-        XCTAssertTrue(app.buttons["Add Items"].exists)
+        XCTAssertTrue(app.buttons["Add Manually"].exists)
 
         app.buttons["emptyAddItemsButton"].tap()
         let editor = app.textViews["addItemsEditor"]
@@ -105,6 +119,7 @@ final class CoreFlowUITests: XCTestCase {
 
         app.staticTexts["Travel Checklist"].tap()
         app.buttons["addItemsButton"].tap()
+        app.buttons["Add Manually"].tap()
         let editor = app.textViews["addItemsEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 2))
         editor.typeText("Camera")
@@ -115,6 +130,113 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertTrue(consentAlert.buttons["Agree and Turn On"].exists)
         consentAlert.buttons["Not Now"].tap()
         XCTAssertFalse(consentAlert.exists)
+    }
+
+    func testAICreateAndSupplementUsingFakeGenerator() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useFakeAIGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Winter trip")
+        app.staticTexts["11 of 1,000 characters"].tap()
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        XCTAssertTrue((topicEditor.value as? String)?.contains("Winter trip") == true)
+
+        topicEditor.tap()
+        topicEditor.typeText(" with children")
+        XCTAssertTrue((topicEditor.value as? String)?.contains("with children") == true)
+
+        app.buttons["generateChecklistButton"].tap()
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+        let generatedTitle = app.textFields["aiGeneratedTitleField"]
+        generatedTitle.tap()
+        generatedTitle.press(forDuration: 1)
+        app.menuItems["Select All"].tap()
+        generatedTitle.typeText("Edited AI List")
+        app.buttons["saveAIGeneratedChecklistButton"].tap()
+        XCTAssertTrue(app.navigationBars["Edited AI List"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Power adapter"].exists)
+
+        app.buttons["addItemsButton"].tap()
+        app.buttons["Add with AI"].tap()
+        XCTAssertTrue(app.textViews["aiTopicEditor"].waitForExistence(timeout: 3))
+        app.buttons["generateChecklistButton"].tap()
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+        app.buttons["saveAIGeneratedChecklistButton"].tap()
+        XCTAssertTrue(app.buttons["Portable charger"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Emergency contact"].exists)
+    }
+
+    func testAIMissingConfigurationOpensSettings() {
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+
+        XCTAssertTrue(app.staticTexts["AI Is Not Configured"].waitForExistence(timeout: 3))
+        app.buttons["openAISettingsButton"].tap()
+        XCTAssertTrue(app.navigationBars["AI Generation"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["aiBaseURLField"].exists)
+    }
+
+    func testAIGenerationKeepsInputAfterErrorAndRetries() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useFlakyAIGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Retry this topic")
+        app.buttons["generateChecklistButton"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts[
+                "The AI service is temporarily unavailable. Please try again later."
+            ].waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue((topicEditor.value as? String)?.contains("Retry this topic") == true)
+
+        app.buttons["Modify AI Configuration"].tap()
+        XCTAssertTrue(app.navigationBars["AI Generation"].waitForExistence(timeout: 3))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        XCTAssertTrue((topicEditor.value as? String)?.contains("Retry this topic") == true)
+
+        let retryButton = app.buttons["generateChecklistButton"]
+        let retryEnabled = expectation(
+            for: NSPredicate(format: "enabled == true"),
+            evaluatedWith: retryButton
+        )
+        wait(for: [retryEnabled], timeout: 2)
+        retryButton.tap()
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["aiGeneratedTitleField"].value as? String, "Retry List")
+    }
+
+    func testAIGenerationCanBeCancelledWithoutLosingInput() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useSlowAIGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Keep this topic")
+        app.buttons["generateChecklistButton"].tap()
+
+        let cancelButton = app.buttons["cancelAIGenerationButton"]
+        XCTAssertTrue(cancelButton.waitForExistence(timeout: 2))
+        cancelButton.tap()
+        XCTAssertTrue((topicEditor.value as? String)?.contains("Keep this topic") == true)
+        XCTAssertFalse(app.textViews["aiGeneratedItemsEditor"].exists)
     }
 
     private func makeApp(additionalArguments: [String] = []) -> XCUIApplication {

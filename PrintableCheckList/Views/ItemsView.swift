@@ -6,6 +6,7 @@ struct ItemsView: View {
     @EnvironmentObject private var store: ChecklistStore
     @State private var editMode: EditMode = .inactive
     @State private var showsNewItems = false
+    @State private var showsAIGeneration = false
     @State private var itemBeingEdited: ChecklistItem?
     @State private var showsPreview = false
 
@@ -32,12 +33,24 @@ struct ItemsView: View {
                     }
 
                     ToolbarItemGroup(placement: .bottomBar) {
-                        Button {
-                            showsNewItems = true
+                        Menu {
+                            Button {
+                                showsNewItems = true
+                            } label: {
+                                Label("Add Manually", systemImage: "square.and.pencil")
+                            }
+                            .accessibilityIdentifier("manualAddItemsButton")
+
+                            Button {
+                                showsAIGeneration = true
+                            } label: {
+                                Label("Add with AI", systemImage: "sparkles")
+                            }
+                            .accessibilityIdentifier("aiAddItemsButton")
                         } label: {
                             toolbarLabel("Add", systemImage: "plus")
                         }
-                        .accessibilityHint(Text("Add one or more items, one per line"))
+                        .accessibilityHint(Text("Add items manually or ask AI for suggestions"))
                         .accessibilityIdentifier("addItemsButton")
 
                         Spacer()
@@ -77,6 +90,17 @@ struct ItemsView: View {
         .sheet(isPresented: $showsNewItems) {
             ItemsEditorSheet { text in
                 store.addItems(projectID: projectID, text: text)
+            }
+        }
+        .sheet(isPresented: $showsAIGeneration) {
+            AIChecklistGenerationSheet(
+                mode: .supplement,
+                existingProject: store.project(id: projectID)
+            ) { draft in
+                store.addItems(
+                    projectID: projectID,
+                    text: draft.items.joined(separator: "\n")
+                )
             }
         }
         .sheet(item: $itemBeingEdited) { item in
@@ -155,13 +179,23 @@ struct ItemsView: View {
         } description: {
             Text("Add your first items. You can enter one item per line.")
         } actions: {
-            Button {
-                showsNewItems = true
-            } label: {
-                Label("Add Items", systemImage: "plus")
+            VStack(spacing: 12) {
+                Button {
+                    showsNewItems = true
+                } label: {
+                    Label("Add Manually", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("emptyAddItemsButton")
+
+                Button {
+                    showsAIGeneration = true
+                } label: {
+                    Label("Add with AI", systemImage: "sparkles")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("emptyAIAddItemsButton")
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("emptyAddItemsButton")
         }
     }
 

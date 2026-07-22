@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var path: [AppRoute] = []
     @State private var editMode: EditMode = .inactive
     @State private var showsNewProject = false
+    @State private var showsAIGeneration = false
     @State private var projectBeingEdited: ChecklistProject?
     @State private var pendingCreatedProjectID: UUID?
 
@@ -35,12 +36,24 @@ struct HomeView: View {
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
-                    Button {
-                        showsNewProject = true
+                    Menu {
+                        Button {
+                            showsNewProject = true
+                        } label: {
+                            Label("Create Manually", systemImage: "square.and.pencil")
+                        }
+                        .accessibilityIdentifier("manualNewListButton")
+
+                        Button {
+                            showsAIGeneration = true
+                        } label: {
+                            Label("Generate with AI", systemImage: "sparkles")
+                        }
+                        .accessibilityIdentifier("aiNewListButton")
                     } label: {
                         Label("New List", systemImage: "plus")
                     }
-                    .accessibilityHint(Text("Create a list and optionally add its first items"))
+                    .accessibilityHint(Text("Create a list manually or generate one with AI"))
                     .accessibilityIdentifier("newListButton")
 
                     Spacer()
@@ -70,6 +83,20 @@ struct HomeView: View {
                 pendingCreatedProjectID = store.addProject(
                     title: title,
                     itemsText: itemsText
+                )
+            }
+        }
+        .sheet(
+            isPresented: $showsAIGeneration,
+            onDismiss: openPendingProject
+        ) {
+            AIChecklistGenerationSheet(
+                mode: .create,
+                existingProject: nil
+            ) { draft in
+                pendingCreatedProjectID = store.addProject(
+                    title: draft.title,
+                    itemsText: draft.items.joined(separator: "\n")
                 )
             }
         }
@@ -148,13 +175,23 @@ struct HomeView: View {
         } description: {
             Text("Start by creating a list you can preview and print.")
         } actions: {
-            Button {
-                showsNewProject = true
-            } label: {
-                Label("Create Your First List", systemImage: "plus")
+            VStack(spacing: 12) {
+                Button {
+                    showsNewProject = true
+                } label: {
+                    Label("Create Manually", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("emptyCreateListButton")
+
+                Button {
+                    showsAIGeneration = true
+                } label: {
+                    Label("Generate with AI", systemImage: "sparkles")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("emptyAINewListButton")
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("emptyCreateListButton")
         }
     }
 

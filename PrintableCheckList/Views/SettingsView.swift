@@ -14,6 +14,24 @@ struct SettingsView: View {
     var body: some View {
         List {
             Section {
+                NavigationLink {
+                    AIConfigurationView()
+                } label: {
+                    LabeledContent {
+                        Text(aiConfigurationStatus)
+                            .foregroundStyle(.secondary)
+                    } label: {
+                        Label("AI Checklist Generation", systemImage: "sparkles")
+                    }
+                }
+                .accessibilityIdentifier("aiConfigurationLink")
+            } header: {
+                Text("AI Generation")
+            } footer: {
+                Text("Use your own API Key to generate new lists or supplement existing ones.")
+            }
+
+            Section {
                 Toggle(
                     "iCloud Sync",
                     isOn: Binding(
@@ -92,8 +110,10 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .textCase(nil)
                     .accessibilityLabel(Text("Version \(versionText)"))
+                    .accessibilityIdentifier("appVersionText")
             }
         }
+        .accessibilityIdentifier("settingsList")
         .navigationTitle(Text("Settings"))
         .sheet(isPresented: $showsShareSheet) {
             ActivityView(activityItems: [shareText])
@@ -203,12 +223,14 @@ struct SettingsView: View {
     }
 
     private var versionText: String {
-        let version = Bundle.main.object(
+        Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "-"
-        let build = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleVersion"
-        ) as? String ?? "-"
-        return "\(version) (\(build))"
+    }
+
+    @EnvironmentObject private var aiSettings: LLMConfigurationStore
+
+    private var aiConfigurationStatus: LocalizedStringKey {
+        aiSettings.isConfigured ? "Configured" : "Not Configured"
     }
 }
