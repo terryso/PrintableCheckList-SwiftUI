@@ -7,6 +7,7 @@ struct AIConfigurationView: View {
     @State private var baseURL = ""
     @State private var model = ""
     @State private var apiKey = ""
+    @State private var searchMode: ChecklistSearchMode = .automatic
     @State private var generationPrompt = ""
     @State private var usesCustomGenerationPrompt = false
     @State private var statusMessage: String?
@@ -29,6 +30,13 @@ struct AIConfigurationView: View {
                     guard didLoad, oldValue != newValue else { return }
                     baseURL = newValue.defaultBaseURL
                     model = newValue.defaultModel
+                    if newValue.supportsNativeWebSearch {
+                        if !oldValue.supportsNativeWebSearch {
+                            searchMode = .automatic
+                        }
+                    } else {
+                        searchMode = .off
+                    }
                     statusMessage = nil
                 }
 
@@ -53,6 +61,20 @@ struct AIConfigurationView: View {
                 Text("Connection")
             } footer: {
                 Text("Your API Key is stored in this device's Keychain and is never synced or sent to the developer.")
+            }
+
+            Section {
+                Picker("Web Search", selection: $searchMode) {
+                    ForEach(ChecklistSearchMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .disabled(!provider.supportsNativeWebSearch)
+                .accessibilityIdentifier("aiWebSearchPicker")
+            } header: {
+                Text("Web Search")
+            } footer: {
+                Text(webSearchFooter)
             }
 
             Section {
@@ -166,7 +188,8 @@ struct AIConfigurationView: View {
             model: model,
             customGenerationPrompt: usesCustomGenerationPrompt
                 ? generationPrompt
-                : nil
+                : nil,
+            searchMode: provider.supportsNativeWebSearch ? searchMode : .off
         )
     }
 
@@ -176,6 +199,7 @@ struct AIConfigurationView: View {
         provider = settings.configuration.provider
         baseURL = settings.configuration.baseURL
         model = settings.configuration.model
+        searchMode = settings.configuration.searchMode
         loadGenerationPrompt(from: settings.configuration)
     }
 
@@ -188,6 +212,7 @@ struct AIConfigurationView: View {
             apiKey = ""
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
+            searchMode = settings.configuration.searchMode
             loadGenerationPrompt(from: settings.configuration)
             statusMessage = String(localized: "Configuration saved securely.")
             errorMessage = nil
@@ -214,6 +239,7 @@ struct AIConfigurationView: View {
             apiKey = ""
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
+            searchMode = settings.configuration.searchMode
             loadGenerationPrompt(from: settings.configuration)
             statusMessage = nil
             errorMessage = nil
@@ -256,6 +282,7 @@ struct AIConfigurationView: View {
             provider = settings.configuration.provider
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
+            searchMode = settings.configuration.searchMode
             apiKey = ""
             loadGenerationPrompt(from: settings.configuration)
             statusMessage = String(localized: "AI configuration deleted.")
@@ -267,6 +294,13 @@ struct AIConfigurationView: View {
 
     private var localizedDefaultPrompt: String {
         ChecklistPromptDefaults.localizedDefaultGenerationGuidance()
+    }
+
+    private var webSearchFooter: String {
+        if provider.supportsNativeWebSearch {
+            return String(localized: "Automatic search is used only for requests that need current information. Search queries go directly to the selected AI provider.")
+        }
+        return String(localized: "This provider does not have a supported web search adapter, so generation uses the model's existing knowledge.")
     }
 
     private var generationPromptBinding: Binding<String> {

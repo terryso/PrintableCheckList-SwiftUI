@@ -30,8 +30,12 @@ struct AIChecklistGenerationSheet: View {
     @State private var topic = ""
     @State private var generatedTitle = ""
     @State private var generatedItemsText = ""
+    @State private var generatedSources: [ChecklistSource] = []
+    @State private var didUseWebSearch = false
     @State private var isGenerating = false
     @State private var errorMessage: String?
+    @State private var canContinueWithoutWebSearch = false
+    @State private var searchModeOverride: ChecklistSearchMode?
     @State private var showsSettings = false
     @State private var generationTask: Task<Void, Never>?
 
@@ -127,6 +131,14 @@ struct AIChecklistGenerationSheet: View {
                     Button("Modify AI Configuration") {
                         openSettings()
                     }
+
+                    if canContinueWithoutWebSearch {
+                        Button("Continue Without Web Search") {
+                            searchModeOverride = .off
+                            performGeneration()
+                        }
+                        .accessibilityIdentifier("continueWithoutWebSearchButton")
+                    }
                 }
             }
 
@@ -190,10 +202,39 @@ struct AIChecklistGenerationSheet: View {
                 Text(generatedItemCountText)
             }
 
+            if didUseWebSearch {
+                Section {
+                    if generatedSources.isEmpty {
+                        Label("Web search was used for this result.", systemImage: "globe")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(generatedSources) { source in
+                            Link(destination: source.url) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(source.title)
+                                        .foregroundStyle(.primary)
+                                    Text(source.url.host ?? source.url.absoluteString)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityHint(Text("Opens the source in your browser"))
+                        }
+                    }
+                } header: {
+                    Text("Sources")
+                } footer: {
+                    Text("Sources are provided for reference and are not saved in the checklist.")
+                }
+                .accessibilityIdentifier("aiSourcesSection")
+            }
+
             Section {
                 Button {
                     generatedTitle = ""
                     generatedItemsText = ""
+                    generatedSources = []
+                    didUseWebSearch = false
                     requestGeneration()
                 } label: {
                     Label("Generate Again", systemImage: "arrow.clockwise")
@@ -255,7 +296,8 @@ struct AIChecklistGenerationSheet: View {
             languageIdentifier: Locale.current.identifier,
             existingTitle: existingProject?.title,
             existingItems: Array(existingProject?.items.map(\.title).prefix(200) ?? []),
-            customGenerationPrompt: settings.configuration.customGenerationPrompt
+            customGenerationPrompt: settings.configuration.customGenerationPrompt,
+            searchModeOverride: searchModeOverride
         )
     }
 
@@ -289,6 +331,8 @@ struct AIChecklistGenerationSheet: View {
     private func requestGeneration() {
         focusedField = nil
         errorMessage = nil
+        canContinueWithoutWebSearch = false
+        searchModeOverride = nil
         guard settings.isConfigured else {
             errorMessage = ChecklistGenerationError.configurationMissing.localizedDescription
             return
@@ -311,12 +355,15 @@ struct AIChecklistGenerationSheet: View {
 
             isGenerating = true
             errorMessage = nil
+            canContinueWithoutWebSearch = false
+            generatedSources = []
+            didUseWebSearch = false
             let currentRequest = request
             generationTask = Task {
                 do {
-                    let rawDraft = try await generator.generate(request: currentRequest)
+                    let result = try await generator.generate(request: currentRequest)
                     let draft = try AIResultNormalizer.normalize(
-                        rawDraft,
+                        result.draft,
                         mode: mode,
                         existingTitle: existingProject?.title,
                         existingItems: existingProject?.items.map(\.title) ?? []
@@ -324,12 +371,16 @@ struct AIChecklistGenerationSheet: View {
                     guard !Task.isCancelled else { return }
                     generatedTitle = draft.title
                     generatedItemsText = draft.items.joined(separator: "\n")
+                    generatedSources = result.sources
+                    didUseWebSearch = result.didSearch
                 } catch is CancellationError {
                     // Cancellation is an explicit user action and does not need an error alert.
                 } catch {
                     isGenerating = false
                     generationTask = nil
                     errorMessage = error.localizedDescription
+                    canContinueWithoutWebSearch = (error as? ChecklistGenerationError)
+                        == .webSearchUnavailable
                     return
                 }
                 isGenerating = false

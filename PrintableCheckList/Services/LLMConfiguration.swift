@@ -43,12 +43,47 @@ struct LLMConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
     var model: String
     var customGenerationPrompt: String? = nil
+    var searchMode: ChecklistSearchMode = .automatic
+
+    init(
+        provider: LLMProviderPreset,
+        baseURL: String,
+        model: String,
+        customGenerationPrompt: String? = nil,
+        searchMode: ChecklistSearchMode = .automatic
+    ) {
+        self.provider = provider
+        self.baseURL = baseURL
+        self.model = model
+        self.customGenerationPrompt = customGenerationPrompt
+        self.searchMode = searchMode
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case provider, baseURL, model, customGenerationPrompt, searchMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        provider = try container.decode(LLMProviderPreset.self, forKey: .provider)
+        baseURL = try container.decode(String.self, forKey: .baseURL)
+        model = try container.decode(String.self, forKey: .model)
+        customGenerationPrompt = try container.decodeIfPresent(
+            String.self,
+            forKey: .customGenerationPrompt
+        )
+        searchMode = try container.decodeIfPresent(
+            ChecklistSearchMode.self,
+            forKey: .searchMode
+        ) ?? .automatic
+    }
 
     static let `default` = LLMConfiguration(
         provider: .glm,
         baseURL: LLMProviderPreset.glm.defaultBaseURL,
         model: LLMProviderPreset.glm.defaultModel,
-        customGenerationPrompt: nil
+        customGenerationPrompt: nil,
+        searchMode: .automatic
     )
 
     func applyingPreset(_ preset: LLMProviderPreset) -> LLMConfiguration {
@@ -56,7 +91,8 @@ struct LLMConfiguration: Codable, Equatable, Sendable {
             provider: preset,
             baseURL: preset.defaultBaseURL,
             model: preset.defaultModel,
-            customGenerationPrompt: customGenerationPrompt
+            customGenerationPrompt: customGenerationPrompt,
+            searchMode: preset.supportsNativeWebSearch ? searchMode : .off
         )
     }
 }
@@ -117,12 +153,32 @@ enum LLMEndpointBuilder {
         return result
     }
 
+    static func webSearchURL(from value: String) throws -> URL {
+        try serviceURL(from: value, endpoint: "web_search")
+    }
+
+    static func responsesURL(from value: String) throws -> URL {
+        try serviceURL(from: value, endpoint: "responses")
+    }
+
     static func host(from value: String) throws -> String {
         let components = try validatedComponents(from: value)
         guard let host = components.host?.lowercased() else {
             throw LLMConfigurationError.invalidURL
         }
         return host
+    }
+
+    private static func serviceURL(from value: String, endpoint: String) throws -> URL {
+        let normalizedBaseURL = try normalizedBaseURLString(from: value)
+        var components = try validatedComponents(from: normalizedBaseURL)
+        let path = components.path
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + (path.isEmpty ? endpoint : "\(path)/\(endpoint)")
+        guard let url = components.url else {
+            throw LLMConfigurationError.invalidURL
+        }
+        return url
     }
 
     private static func validatedComponents(from value: String) throws -> URLComponents {
@@ -240,7 +296,11 @@ final class LLMConfigurationStore: ObservableObject {
             let data = userDefaults.data(forKey: Self.configurationKey),
             let saved = try? decoder.decode(LLMConfiguration.self, from: data)
         {
-            configuration = saved
+            var normalized = saved
+            if !normalized.provider.supportsNativeWebSearch {
+                normalized.searchMode = .off
+            }
+            configuration = normalized
         } else {
             configuration = .default
         }
@@ -278,7 +338,10 @@ final class LLMConfigurationStore: ObservableObject {
             model: normalizedModel,
             customGenerationPrompt: ChecklistPromptDefaults.normalizedCustomPrompt(
                 newConfiguration.customGenerationPrompt
-            )
+            ),
+            searchMode: newConfiguration.provider.supportsNativeWebSearch
+                ? newConfiguration.searchMode
+                : .off
         )
         try persistConfiguration()
         hasAPIKey = true

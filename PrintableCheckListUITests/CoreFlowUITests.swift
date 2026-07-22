@@ -83,6 +83,9 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertTrue(promptEditor.waitForExistence(timeout: 3))
         XCTAssertTrue((promptEditor.value as? String)?.contains("rankings") == true)
         XCTAssertFalse(app.buttons["restoreDefaultAIPromptButton"].isEnabled)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["aiWebSearchPicker"].exists
+        )
     }
 
     func testEmptyListGuidesUserToAddItems() {

@@ -118,6 +118,7 @@ final class AIGenerationTests: XCTestCase {
         )
         let configuration = try JSONDecoder().decode(LLMConfiguration.self, from: legacy)
         XCTAssertNil(configuration.customGenerationPrompt)
+        XCTAssertEqual(configuration.searchMode, .automatic)
     }
 
     func testEndpointValidationAndNormalization() throws {
@@ -138,6 +139,18 @@ final class AIGenerationTests: XCTestCase {
         )
         XCTAssertThrowsError(
             try LLMEndpointBuilder.chatCompletionsURL(from: "https://user:pass@example.com/v1")
+        )
+        XCTAssertEqual(
+            try LLMEndpointBuilder.webSearchURL(
+                from: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+            ).absoluteString,
+            "https://open.bigmodel.cn/api/paas/v4/web_search"
+        )
+        XCTAssertEqual(
+            try LLMEndpointBuilder.responsesURL(
+                from: "https://api.openai.com/v1/"
+            ).absoluteString,
+            "https://api.openai.com/v1/responses"
         )
     }
 
@@ -175,6 +188,63 @@ final class AIGenerationTests: XCTestCase {
         XCTAssertEqual(
             restored.configuration.customGenerationPrompt,
             "Return compact reference lists."
+        )
+        XCTAssertEqual(restored.configuration.searchMode, .automatic)
+    }
+
+    func testUnsupportedProviderDisablesSavedWebSearch() throws {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = LLMConfigurationStore(
+            userDefaults: defaults,
+            credentialStore: TestCredentialStore("key")
+        )
+        let configuration = LLMConfiguration(
+            provider: .deepSeek,
+            baseURL: LLMProviderPreset.deepSeek.defaultBaseURL,
+            model: LLMProviderPreset.deepSeek.defaultModel,
+            searchMode: .always
+        )
+
+        try store.save(configuration: configuration, apiKey: nil)
+
+        XCTAssertEqual(store.configuration.searchMode, .off)
+        XCTAssertFalse(LLMProviderPreset.deepSeek.supportsNativeWebSearch)
+        XCTAssertTrue(LLMProviderPreset.glm.supportsNativeWebSearch)
+        XCTAssertTrue(LLMProviderPreset.openAI.supportsNativeWebSearch)
+    }
+
+    func testAutomaticSearchIntentOnlyMatchesCurrentInformationRequests() {
+        XCTAssertTrue(
+            SearchIntentDetector.shouldSearch(
+                request: Self.createRequest(withTopic: "全球十大票房电影排行榜"),
+                mode: .automatic
+            )
+        )
+        XCTAssertTrue(
+            SearchIntentDetector.shouldSearch(
+                request: Self.createRequest(withTopic: "Latest exchange rates"),
+                mode: .automatic
+            )
+        )
+        XCTAssertFalse(
+            SearchIntentDetector.shouldSearch(
+                request: Self.createRequest(withTopic: "Family camping checklist"),
+                mode: .automatic
+            )
+        )
+        XCTAssertTrue(
+            SearchIntentDetector.shouldSearch(
+                request: Self.createRequest(withTopic: "Family camping checklist"),
+                mode: .always
+            )
+        )
+        XCTAssertFalse(
+            SearchIntentDetector.shouldSearch(
+                request: Self.createRequest(withTopic: "最新新闻"),
+                mode: .off
+            )
         )
     }
 
@@ -271,7 +341,7 @@ final class AIGenerationTests: XCTestCase {
                 existingItems: (0..<205).map { "Item \($0)" }
             )
         )
-        XCTAssertEqual(result.items, ["Umbrella", "Power adapter"])
+        XCTAssertEqual(result.draft.items, ["Umbrella", "Power adapter"])
     }
 
     func testJSONModeRejectionRetriesOnceWithoutResponseFormat() async throws {
@@ -315,7 +385,7 @@ final class AIGenerationTests: XCTestCase {
             session: session
         )
         let result = try await generator.generate(request: Self.createRequest)
-        XCTAssertEqual(result.title, "Trip")
+        XCTAssertEqual(result.draft.title, "Trip")
 
         for (status, expected) in [
             (401, ChecklistGenerationError.invalidAPIKey),
@@ -356,6 +426,141 @@ final class AIGenerationTests: XCTestCase {
         await assertGenerationError(.invalidResponse, generator: generator)
     }
 
+    func testGLMSearchIsConvertedToSharedEvidenceAndSources() async throws {
+        let session = makeSession()
+        var requestedPaths: [String] = []
+        URLProtocolStub.setHandler { request in
+            requestedPaths.append(request.url?.path ?? "")
+            let body = try Self.bodyData(from: request)
+            let bodyText = try XCTUnwrap(String(data: body, encoding: .utf8))
+            if request.url?.path.hasSuffix("/web_search") == true {
+                XCTAssertTrue(bodyText.contains("全球十大票房电影"))
+                XCTAssertTrue(bodyText.contains("\"search_engine\":\"search_std\""))
+                return .response(
+                    status: 200,
+                    data: Data(
+                        #"{"search_result":[{"title":"Worldwide Box Office","content":"Avatar leads the worldwide chart.","link":"https://example.com/box-office","publish_date":"2026-07-22"}]}"#.utf8
+                    )
+                )
+            }
+            XCTAssertTrue(bodyText.contains("web_search_material"))
+            XCTAssertTrue(bodyText.contains("Avatar leads the worldwide chart"))
+            XCTAssertTrue(bodyText.contains("example.com"))
+            return .response(status: 200, data: Self.successData)
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: .default,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try GLMWebSearchResearcher(
+            baseURL: LLMProviderPreset.glm.defaultBaseURL,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .automatic
+        )
+
+        let result = try await generator.generate(
+            request: Self.createRequest(withTopic: "全球十大票房电影")
+        )
+
+        XCTAssertEqual(requestedPaths, [
+            "/api/paas/v4/web_search",
+            "/api/paas/v4/chat/completions",
+        ])
+        XCTAssertTrue(result.didSearch)
+        XCTAssertEqual(result.sources.map(\.title), ["Worldwide Box Office"])
+        XCTAssertEqual(result.draft.items, ["Umbrella", "Power adapter"])
+    }
+
+    func testOpenAIResponsesSearchUsesSharedResultContract() async throws {
+        let session = makeSession()
+        let configuration = LLMConfiguration(
+            provider: .openAI,
+            baseURL: LLMProviderPreset.openAI.defaultBaseURL,
+            model: "gpt-5-mini",
+            searchMode: .always
+        )
+        var requestedPaths: [String] = []
+        URLProtocolStub.setHandler { request in
+            requestedPaths.append(request.url?.path ?? "")
+            let body = try Self.bodyData(from: request)
+            let bodyText = try XCTUnwrap(String(data: body, encoding: .utf8))
+            if request.url?.path.hasSuffix("/responses") == true {
+                XCTAssertTrue(bodyText.contains("\"type\":\"web_search\""))
+                XCTAssertTrue(bodyText.contains("\"tool_choice\":\"required\""))
+                XCTAssertTrue(bodyText.contains("\"store\":false"))
+                return .response(
+                    status: 200,
+                    data: Data(
+                        #"{"output":[{"type":"message","content":[{"type":"output_text","text":"Avatar leads the current worldwide chart.","annotations":[{"type":"url_citation","url":"https://example.com/openai-source","title":"Current chart"}]}]}]}"#.utf8
+                    )
+                )
+            }
+            XCTAssertTrue(bodyText.contains("Avatar leads the current worldwide chart"))
+            return .response(status: 200, data: Self.successData)
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: configuration,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try OpenAIWebSearchResearcher(
+            configuration: configuration,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .always
+        )
+
+        let result = try await generator.generate(request: Self.createRequest)
+
+        XCTAssertEqual(requestedPaths, ["/v1/responses", "/v1/chat/completions"])
+        XCTAssertTrue(result.didSearch)
+        XCTAssertEqual(result.sources.first?.title, "Current chart")
+        XCTAssertEqual(result.sources.first?.url.absoluteString, "https://example.com/openai-source")
+    }
+
+    func testAutomaticSearchBypassesResearchForStaticChecklist() async throws {
+        let session = makeSession()
+        var requestCount = 0
+        URLProtocolStub.setHandler { request in
+            requestCount += 1
+            XCTAssertTrue(request.url?.path.hasSuffix("/chat/completions") == true)
+            return .response(status: 200, data: Self.successData)
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: .default,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try GLMWebSearchResearcher(
+            baseURL: LLMProviderPreset.glm.defaultBaseURL,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .automatic
+        )
+
+        let result = try await generator.generate(
+            request: Self.createRequest(withTopic: "Family camping checklist")
+        )
+
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertFalse(result.didSearch)
+        XCTAssertTrue(result.sources.isEmpty)
+    }
+
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]
@@ -383,6 +588,16 @@ final class AIGenerationTests: XCTestCase {
         existingTitle: nil,
         existingItems: []
     )
+
+    private static func createRequest(withTopic topic: String) -> ChecklistGenerationRequest {
+        ChecklistGenerationRequest(
+            mode: .create,
+            topic: topic,
+            languageIdentifier: "en",
+            existingTitle: nil,
+            existingItems: []
+        )
+    }
 
     private static let successData = Data(
         "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"title\\\":\\\"Travel\\\",\\\"items\\\":[\\\"Umbrella\\\",\\\"Power adapter\\\"]}\"}}]}".utf8

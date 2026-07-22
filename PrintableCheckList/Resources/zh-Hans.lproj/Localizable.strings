@@ -156,3 +156,15 @@
 "Invalid address" = "地址无效";
 "%ld generated item" = "已生成 %ld 项";
 "%ld generated items" = "已生成 %ld 项";
+"Off" = "关闭";
+"Automatic" = "自动";
+"Always" = "总是";
+"Web Search" = "联网搜索";
+"Automatic search is used only for requests that need current information. Search queries go directly to the selected AI provider." = "自动模式只会在需要最新信息时联网；搜索内容会直接发送给所选 AI 服务商。";
+"This provider does not have a supported web search adapter, so generation uses the model's existing knowledge." = "当前服务商没有受支持的联网搜索适配器，将使用模型已有知识生成。";
+"Web search is temporarily unavailable. Try again or continue without web search." = "联网搜索暂时不可用，请重试或不联网继续生成。";
+"Continue Without Web Search" = "不联网继续生成";
+"Sources" = "参考来源";
+"Web search was used for this result." = "本次结果使用了联网搜索。";
+"Opens the source in your browser" = "在浏览器中打开来源";
+"Sources are provided for reference and are not saved in the checklist." = "来源仅供参考，不会保存到清单中。";

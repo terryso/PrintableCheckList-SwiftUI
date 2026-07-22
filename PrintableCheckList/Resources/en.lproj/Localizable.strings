@@ -156,3 +156,15 @@
 "Invalid address" = "Invalid address";
 "%ld generated item" = "%ld generated item";
 "%ld generated items" = "%ld generated items";
+"Off" = "Off";
+"Automatic" = "Automatic";
+"Always" = "Always";
+"Web Search" = "Web Search";
+"Automatic search is used only for requests that need current information. Search queries go directly to the selected AI provider." = "Automatic search is used only for requests that need current information. Search queries go directly to the selected AI provider.";
+"This provider does not have a supported web search adapter, so generation uses the model's existing knowledge." = "This provider does not have a supported web search adapter, so generation uses the model's existing knowledge.";
+"Web search is temporarily unavailable. Try again or continue without web search." = "Web search is temporarily unavailable. Try again or continue without web search.";
+"Continue Without Web Search" = "Continue Without Web Search";
+"Sources" = "Sources";
+"Web search was used for this result." = "Web search was used for this result.";
+"Opens the source in your browser" = "Opens the source in your browser";
+"Sources are provided for reference and are not saved in the checklist." = "Sources are provided for reference and are not saved in the checklist.";

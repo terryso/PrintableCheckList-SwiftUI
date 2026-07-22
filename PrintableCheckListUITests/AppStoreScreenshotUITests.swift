@@ -26,7 +26,10 @@ final class AppStoreScreenshotUITests: XCTestCase {
         let topicEditor = app.textViews["aiTopicEditor"]
         XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
         topicEditor.typeText("冬天带孩子去日本旅行 7 天，需要滑雪和温泉用品")
-        app.navigationBars["AI 生成清单"].tap()
+        app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "已输入 "))
+            .firstMatch
+            .tap()
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         capture("01-AI输入需求")
 
