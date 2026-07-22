@@ -1,13 +1,15 @@
-# App Store Review Notes — 2.1.0
+# App Store Review Notes — 2.1.1
 
 ## AI checklist generation
 
-Version 2.1.0 adds optional bring-your-own-key AI checklist generation. Reviewers can find it in either location:
+Version 2.1.1 provides optional bring-your-own-key AI checklist generation. Reviewers can find it in either location:
 
 1. Lists → New List → Generate with AI
 2. Open a list → Add → Add with AI
 
 Configuration is available at Settings → AI Checklist Generation. The user selects GLM, OpenAI, DeepSeek, or a custom OpenAI-compatible HTTPS endpoint and supplies their own API Key. No developer-provided AI quota or purchase is included in this version.
+
+Version 2.1.1 also adds an editable Generation Prompt in the AI configuration screen. The localized default distinguishes actionable checklists from rankings and reference lists. Users may customize these content preferences or restore the localized default. The app always appends non-editable JSON response-format and safety requirements so the generated result remains parseable.
 
 The user explicitly starts each request by tapping Generate after configuring their selected provider. A new-list request sends the topic and requirements. A supplement request can also send the current list title and up to the first 200 item texts. The request travels directly from the device to the provider and does not pass through the developer's Supabase service.
 

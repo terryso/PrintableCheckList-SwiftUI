@@ -7,6 +7,8 @@ struct AIConfigurationView: View {
     @State private var baseURL = ""
     @State private var model = ""
     @State private var apiKey = ""
+    @State private var generationPrompt = ""
+    @State private var usesCustomGenerationPrompt = false
     @State private var statusMessage: String?
     @State private var errorMessage: String?
     @State private var isTesting = false
@@ -54,6 +56,32 @@ struct AIConfigurationView: View {
             }
 
             Section {
+                TextEditor(text: generationPromptBinding)
+                    .frame(minHeight: 220)
+                    .accessibilityLabel(Text("Generation Prompt"))
+                    .accessibilityIdentifier("aiGenerationPromptEditor")
+
+                HStack {
+                    Text(promptSourceText)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(promptCharacterCountText)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.footnote)
+
+                Button("Restore Default Prompt") {
+                    restoreDefaultPrompt()
+                }
+                .disabled(!usesCustomGenerationPrompt)
+                .accessibilityIdentifier("restoreDefaultAIPromptButton")
+            } header: {
+                Text("Generation Prompt")
+            } footer: {
+                Text("Customize how AI interprets list requests. The App always adds fixed JSON format and safety requirements that cannot be edited here.")
+            }
+
+            Section {
                 Button("Save Configuration") {
                     saveConfiguration()
                 }
@@ -98,6 +126,7 @@ struct AIConfigurationView: View {
         }
         .navigationTitle(Text("AI Generation"))
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear(perform: loadConfigurationIfNeeded)
         .alert(
             Text(testConfirmationTitle),
@@ -134,7 +163,10 @@ struct AIConfigurationView: View {
         LLMConfiguration(
             provider: provider,
             baseURL: baseURL,
-            model: model
+            model: model,
+            customGenerationPrompt: usesCustomGenerationPrompt
+                ? generationPrompt
+                : nil
         )
     }
 
@@ -144,6 +176,7 @@ struct AIConfigurationView: View {
         provider = settings.configuration.provider
         baseURL = settings.configuration.baseURL
         model = settings.configuration.model
+        loadGenerationPrompt(from: settings.configuration)
     }
 
     private func saveConfiguration() {
@@ -155,6 +188,7 @@ struct AIConfigurationView: View {
             apiKey = ""
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
+            loadGenerationPrompt(from: settings.configuration)
             statusMessage = String(localized: "Configuration saved securely.")
             errorMessage = nil
         } catch {
@@ -180,6 +214,7 @@ struct AIConfigurationView: View {
             apiKey = ""
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
+            loadGenerationPrompt(from: settings.configuration)
             statusMessage = nil
             errorMessage = nil
             showsTestConfirmation = true
@@ -222,10 +257,60 @@ struct AIConfigurationView: View {
             baseURL = settings.configuration.baseURL
             model = settings.configuration.model
             apiKey = ""
+            loadGenerationPrompt(from: settings.configuration)
             statusMessage = String(localized: "AI configuration deleted.")
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var localizedDefaultPrompt: String {
+        ChecklistPromptDefaults.localizedDefaultGenerationGuidance()
+    }
+
+    private var generationPromptBinding: Binding<String> {
+        Binding(
+            get: { generationPrompt },
+            set: { newValue in
+                generationPrompt = String(
+                    newValue.prefix(ChecklistPromptDefaults.maximumCustomPromptLength)
+                )
+                usesCustomGenerationPrompt = true
+                statusMessage = nil
+            }
+        )
+    }
+
+    private var promptSourceText: String {
+        usesCustomGenerationPrompt
+            ? String(localized: "Customized")
+            : String(localized: "Localized Default")
+    }
+
+    private var promptCharacterCountText: String {
+        String.localizedStringWithFormat(
+            String(localized: "%ld of 4,000 characters"),
+            generationPrompt.count
+        )
+    }
+
+    private func loadGenerationPrompt(from configuration: LLMConfiguration) {
+        if let customPrompt = ChecklistPromptDefaults.normalizedCustomPrompt(
+            configuration.customGenerationPrompt
+        ) {
+            generationPrompt = customPrompt
+            usesCustomGenerationPrompt = true
+        } else {
+            generationPrompt = localizedDefaultPrompt
+            usesCustomGenerationPrompt = false
+        }
+    }
+
+    private func restoreDefaultPrompt() {
+        generationPrompt = localizedDefaultPrompt
+        usesCustomGenerationPrompt = false
+        statusMessage = nil
+        errorMessage = nil
     }
 }

@@ -112,6 +112,12 @@
 "Testing sends a minimal request to the selected provider and uses a small amount of your quota." = "测试会向所选服务商发送一个最小请求，并使用少量你的额度。";
 "AI requests go directly from this device to the selected provider. Configuration is saved separately on each device." = "AI 请求从本设备直接发送给所选服务商；每台设备需要单独保存配置。";
 "Use your own API Key to generate new lists or supplement existing ones." = "使用你自己的 API Key 生成新清单或补充已有清单。";
+"Generation Prompt" = "生成提示词";
+"Restore Default Prompt" = "恢复默认提示词";
+"Customized" = "已自定义";
+"Localized Default" = "本地化默认值";
+"%ld of 4,000 characters" = "已输入 %ld / 4,000 字";
+"Customize how AI interprets list requests. The App always adds fixed JSON format and safety requirements that cannot be edited here." = "你可以调整 AI 理解清单需求的方式。App 始终会附加固定的 JSON 格式和安全要求，这些要求不能在此处修改。";
 "Enter a valid HTTPS Base URL without a username or password." = "请输入不含用户名和密码的有效 HTTPS Base URL。";
 "Enter a model name." = "请输入模型名称。";
 "Enter an API Key." = "请输入 API Key。";

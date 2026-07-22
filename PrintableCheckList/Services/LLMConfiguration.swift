@@ -42,18 +42,21 @@ struct LLMConfiguration: Codable, Equatable, Sendable {
     var provider: LLMProviderPreset
     var baseURL: String
     var model: String
+    var customGenerationPrompt: String? = nil
 
     static let `default` = LLMConfiguration(
         provider: .glm,
         baseURL: LLMProviderPreset.glm.defaultBaseURL,
-        model: LLMProviderPreset.glm.defaultModel
+        model: LLMProviderPreset.glm.defaultModel,
+        customGenerationPrompt: nil
     )
 
     func applyingPreset(_ preset: LLMProviderPreset) -> LLMConfiguration {
         LLMConfiguration(
             provider: preset,
             baseURL: preset.defaultBaseURL,
-            model: preset.defaultModel
+            model: preset.defaultModel,
+            customGenerationPrompt: customGenerationPrompt
         )
     }
 }
@@ -272,7 +275,10 @@ final class LLMConfigurationStore: ObservableObject {
         configuration = LLMConfiguration(
             provider: newConfiguration.provider,
             baseURL: normalizedBaseURL,
-            model: normalizedModel
+            model: normalizedModel,
+            customGenerationPrompt: ChecklistPromptDefaults.normalizedCustomPrompt(
+                newConfiguration.customGenerationPrompt
+            )
         )
         try persistConfiguration()
         hasAPIKey = true

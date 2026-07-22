@@ -85,6 +85,41 @@ final class AIGenerationTests: XCTestCase {
         XCTAssertEqual(LLMProviderPreset.custom.defaultBaseURL, "")
     }
 
+    func testLocalizedPromptDefaultsDistinguishChecklistsFromRankings() {
+        let chinese = ChecklistPromptDefaults.defaultGenerationGuidance(
+            languageIdentifier: "zh-Hans"
+        )
+        XCTAssertTrue(chinese.contains("排行榜"))
+        XCTAssertTrue(chinese.contains("查看、确认、核实、研究"))
+        XCTAssertTrue(chinese.contains("严格遵守该数量"))
+
+        let english = ChecklistPromptDefaults.defaultGenerationGuidance(
+            languageIdentifier: "en"
+        )
+        XCTAssertTrue(english.contains("rankings"))
+        XCTAssertTrue(english.contains("requested entries themselves"))
+        XCTAssertTrue(english.contains("requested item count exactly"))
+    }
+
+    func testCustomPromptCannotRemoveFixedResponseContract() {
+        let prompt = ChecklistPromptDefaults.systemPrompt(
+            customPrompt: "Always add one emoji to each item.",
+            languageIdentifier: "en"
+        )
+        XCTAssertTrue(prompt.contains("Always add one emoji to each item."))
+        XCTAssertTrue(prompt.contains("Protocol requirements below always override"))
+        XCTAssertTrue(prompt.contains(#"{"title":"...","items":["..."]}"#))
+        XCTAssertTrue(prompt.contains("Do not use Markdown"))
+    }
+
+    func testLegacyConfigurationDecodesWithoutCustomPrompt() throws {
+        let legacy = Data(
+            #"{"provider":"glm","baseURL":"https://open.bigmodel.cn/api/paas/v4","model":"glm-4.7-flash"}"#.utf8
+        )
+        let configuration = try JSONDecoder().decode(LLMConfiguration.self, from: legacy)
+        XCTAssertNil(configuration.customGenerationPrompt)
+    }
+
     func testEndpointValidationAndNormalization() throws {
         XCTAssertEqual(
             try LLMEndpointBuilder.chatCompletionsURL(
@@ -125,8 +160,22 @@ final class AIGenerationTests: XCTestCase {
 
         var changed = store.configuration
         changed.baseURL = "https://api.example.com/v1"
+        changed.customGenerationPrompt = "Return compact reference lists."
         try store.save(configuration: changed, apiKey: nil)
         XCTAssertEqual(store.configuration.baseURL, "https://api.example.com/v1")
+        XCTAssertEqual(
+            store.configuration.customGenerationPrompt,
+            "Return compact reference lists."
+        )
+
+        let restored = LLMConfigurationStore(
+            userDefaults: defaults,
+            credentialStore: credentials
+        )
+        XCTAssertEqual(
+            restored.configuration.customGenerationPrompt,
+            "Return compact reference lists."
+        )
     }
 
     func testKeychainCredentialRoundTrip() throws {
@@ -202,6 +251,8 @@ final class AIGenerationTests: XCTestCase {
             let body = try Self.bodyData(from: request)
             let text = try XCTUnwrap(String(data: body, encoding: .utf8))
             XCTAssertTrue(text.contains("\"response_format\""))
+            XCTAssertTrue(text.contains("requested entries themselves"))
+            XCTAssertTrue(text.contains("Protocol requirements below always override"))
             XCTAssertTrue(text.contains("Item 199"))
             XCTAssertFalse(text.contains("Item 200"))
             return .response(status: 200, data: Self.successData)

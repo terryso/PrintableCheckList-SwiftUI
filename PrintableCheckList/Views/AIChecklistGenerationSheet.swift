@@ -254,7 +254,8 @@ struct AIChecklistGenerationSheet: View {
             topic: topic.trimmingCharacters(in: .whitespacesAndNewlines),
             languageIdentifier: Locale.current.identifier,
             existingTitle: existingProject?.title,
-            existingItems: Array(existingProject?.items.map(\.title).prefix(200) ?? [])
+            existingItems: Array(existingProject?.items.map(\.title).prefix(200) ?? []),
+            customGenerationPrompt: settings.configuration.customGenerationPrompt
         )
     }
 

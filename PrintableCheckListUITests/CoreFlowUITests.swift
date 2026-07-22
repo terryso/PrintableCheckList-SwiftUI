@@ -70,8 +70,19 @@ final class CoreFlowUITests: XCTestCase {
         }
         let versionText = app.staticTexts["appVersionText"]
         XCTAssertTrue(versionText.waitForExistence(timeout: 2))
-        XCTAssertEqual(versionText.label, "Version 2.1.0")
+        XCTAssertEqual(versionText.label, "Version 2.1.1")
         XCTAssertFalse(versionText.label.contains("("))
+    }
+
+    func testAIConfigurationShowsLocalizedDefaultPrompt() {
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
+        app.descendants(matching: .any)["aiConfigurationLink"].tap()
+
+        let promptEditor = app.textViews["aiGenerationPromptEditor"]
+        XCTAssertTrue(promptEditor.waitForExistence(timeout: 3))
+        XCTAssertTrue((promptEditor.value as? String)?.contains("rankings") == true)
+        XCTAssertFalse(app.buttons["restoreDefaultAIPromptButton"].isEnabled)
     }
 
     func testEmptyListGuidesUserToAddItems() {

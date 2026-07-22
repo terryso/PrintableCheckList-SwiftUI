@@ -112,6 +112,12 @@
 "Testing sends a minimal request to the selected provider and uses a small amount of your quota." = "Testing sends a minimal request to the selected provider and uses a small amount of your quota.";
 "AI requests go directly from this device to the selected provider. Configuration is saved separately on each device." = "AI requests go directly from this device to the selected provider. Configuration is saved separately on each device.";
 "Use your own API Key to generate new lists or supplement existing ones." = "Use your own API Key to generate new lists or supplement existing ones.";
+"Generation Prompt" = "Generation Prompt";
+"Restore Default Prompt" = "Restore Default Prompt";
+"Customized" = "Customized";
+"Localized Default" = "Localized Default";
+"%ld of 4,000 characters" = "%ld of 4,000 characters";
+"Customize how AI interprets list requests. The App always adds fixed JSON format and safety requirements that cannot be edited here." = "Customize how AI interprets list requests. The App always adds fixed JSON format and safety requirements that cannot be edited here.";
 "Enter a valid HTTPS Base URL without a username or password." = "Enter a valid HTTPS Base URL without a username or password.";
 "Enter a model name." = "Enter a model name.";
 "Enter an API Key." = "Enter an API Key.";
