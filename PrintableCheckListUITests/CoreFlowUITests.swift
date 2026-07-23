@@ -70,7 +70,7 @@ final class CoreFlowUITests: XCTestCase {
         }
         let versionText = app.staticTexts["appVersionText"]
         XCTAssertTrue(versionText.waitForExistence(timeout: 2))
-        XCTAssertEqual(versionText.label, "Version 2.1.1")
+        XCTAssertEqual(versionText.label, "Version 2.1.2")
         XCTAssertFalse(versionText.label.contains("("))
     }
 
@@ -82,7 +82,12 @@ final class CoreFlowUITests: XCTestCase {
         let promptEditor = app.textViews["aiGenerationPromptEditor"]
         XCTAssertTrue(promptEditor.waitForExistence(timeout: 3))
         XCTAssertTrue((promptEditor.value as? String)?.contains("rankings") == true)
-        XCTAssertFalse(app.buttons["restoreDefaultAIPromptButton"].isEnabled)
+        let restoreButton = app.buttons["restoreDefaultAIPromptButton"]
+        for _ in 0..<3 where !restoreButton.exists {
+            promptEditor.swipeUp()
+        }
+        XCTAssertTrue(restoreButton.exists)
+        XCTAssertFalse(restoreButton.isEnabled)
         XCTAssertTrue(
             app.descendants(matching: .any)["aiWebSearchPicker"].exists
         )
@@ -188,14 +193,22 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Emergency contact"].exists)
     }
 
-    func testAIMissingConfigurationOpensSettings() {
+    func testAIRequiresProBeforeConfiguration() {
         app.buttons["newListButton"].tap()
         app.buttons["Generate with AI"].tap()
 
-        XCTAssertTrue(app.staticTexts["AI Is Not Configured"].waitForExistence(timeout: 3))
-        app.buttons["openAISettingsButton"].tap()
-        XCTAssertTrue(app.navigationBars["AI Generation"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["aiBaseURLField"].exists)
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.tap()
+        topicEditor.typeText("Family trip to Japan")
+        app.buttons["generateChecklistButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["Unlock Pro to Use AI"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts[
+                "Pro is a one-time purchase. It includes up to 20 managed AI operations per calendar month and use of your own API Key."
+            ].exists
+        )
     }
 
     func testAIGenerationKeepsInputAfterErrorAndRetries() {

@@ -1,6 +1,6 @@
-// Checked-in defaults. Local.xcconfig is optional and ignored by Git.
+// Shared checked-in defaults. Environment-specific files include this file and
+// then optionally include Local.xcconfig.
 DEVELOPMENT_TEAM =
 SUPABASE_URL =
 SUPABASE_PUBLISHABLE_KEY =
-
-#include? "Local.xcconfig"
+MANAGED_AI_SERVICE_URL =

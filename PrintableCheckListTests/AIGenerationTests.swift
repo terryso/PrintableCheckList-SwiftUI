@@ -76,6 +76,166 @@ final class AIGenerationTests: XCTestCase {
         super.tearDown()
     }
 
+    func testProEntitlementOverrideUnlocksAIForLocalTesting() {
+        let store = ProEntitlementStore(entitlementOverride: true)
+
+        store.start()
+
+        XCTAssertEqual(store.status, .entitled)
+        XCTAssertTrue(store.isEntitled)
+        XCTAssertFalse(store.canPurchase)
+    }
+
+    func testManagedGeneratorFailsClosedWithoutConfiguredService() {
+        XCTAssertThrowsError(
+            try ManagedAIChecklistGenerator(
+                configuration: ManagedAIServiceConfiguration(baseURL: nil),
+                entitlementJWS: "verified-storekit-jws"
+            )
+        ) { error in
+            XCTAssertEqual(error as? ChecklistGenerationError, .managedServiceUnavailable)
+        }
+    }
+
+    func testManagedGeneratorSendsVerifiedTransactionAndSingleOperationContext() async throws {
+        URLProtocolStub.setHandler { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://managed.example.com/functions/v1/managed-ai-checklists")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertNotNil(request.value(forHTTPHeaderField: "Idempotency-Key"))
+
+            let body = try Self.bodyData(from: request)
+            let payload = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: body) as? [String: Any]
+            )
+            XCTAssertEqual(payload["storekit_transaction_jws"] as? String, "verified-storekit-jws")
+            XCTAssertEqual(payload["time_zone"] as? String, TimeZone.current.identifier)
+            let checklistRequest = try XCTUnwrap(payload["checklist_request"] as? [String: Any])
+            XCTAssertEqual(checklistRequest["mode"] as? String, "create")
+            XCTAssertEqual(checklistRequest["topic"] as? String, "Winter family trip")
+            XCTAssertEqual(checklistRequest["language_identifier"] as? String, "en")
+            XCTAssertNil(checklistRequest["languageIdentifier"])
+            XCTAssertNil(checklistRequest["existingTitle"])
+            XCTAssertNil(checklistRequest["existingItems"])
+            XCTAssertNil(checklistRequest["searchMode"])
+
+            return .response(
+                status: 200,
+                data: Data(
+                    #"{"draft":{"title":"Family Trip","items":["Passport"]},"sources":[],"did_search":false}"#
+                        .utf8
+                )
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        let result = try await generator.generate(
+            request: ChecklistGenerationRequest(
+                mode: .create,
+                topic: "Winter family trip",
+                languageIdentifier: "en",
+                existingTitle: nil,
+                existingItems: []
+            )
+        )
+
+        XCTAssertEqual(result.draft, GeneratedChecklistDraft(title: "Family Trip", items: ["Passport"]))
+        XCTAssertFalse(result.didSearch)
+    }
+
+    func testManagedGeneratorReportsInvalidServerEntitlementAsVerificationFailure() async throws {
+        URLProtocolStub.setHandler { _ in
+            .response(
+                status: 403,
+                data: Data(#"{"code":"entitlement_invalid"}"#.utf8)
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        do {
+            _ = try await generator.generate(
+                request: Self.createRequest(withTopic: "Family trip")
+            )
+            XCTFail("Expected the server entitlement rejection to throw")
+        } catch {
+            XCTAssertEqual(error as? ProEntitlementError, .unverifiedTransaction)
+        }
+    }
+
+    func testManagedGeneratorFailsClosedWhenDeviceVerificationFails() async throws {
+        URLProtocolStub.setHandler { _ in
+            .response(
+                status: 403,
+                data: Data(#"{"code":"entitlement_device_jws_invalid_chain_length"}"#.utf8)
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        do {
+            _ = try await generator.generate(
+                request: Self.createRequest(withTopic: "Family trip")
+            )
+            XCTFail("Expected the server entitlement rejection to throw")
+        } catch {
+            XCTAssertEqual(error as? ProEntitlementError, .unverifiedTransaction)
+        }
+    }
+
+    func testManagedGeneratorFailsClosedWhenEntitlementVerificationIsUnavailable() async throws {
+        URLProtocolStub.setHandler { _ in
+            .response(
+                status: 503,
+                data: Data(#"{"code":"entitlement_lookup_unavailable"}"#.utf8)
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        do {
+            _ = try await generator.generate(
+                request: Self.createRequest(withTopic: "Family trip")
+            )
+            XCTFail("Expected the server entitlement availability failure to throw")
+        } catch {
+            XCTAssertEqual(error as? ChecklistGenerationError, .serviceUnavailable)
+        }
+    }
+
     func testProviderPresetsPreferGLMAndRemainEditable() {
         XCTAssertEqual(LLMConfiguration.default.provider, .glm)
         XCTAssertEqual(LLMConfiguration.default.baseURL, "https://open.bigmodel.cn/api/paas/v4")

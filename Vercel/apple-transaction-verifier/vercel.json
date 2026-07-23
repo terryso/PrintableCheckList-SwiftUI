@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/verify-apple-transaction.ts": {
+      "maxDuration": 60
+    }
+  }
+}

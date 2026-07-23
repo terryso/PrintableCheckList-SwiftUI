@@ -25,6 +25,7 @@ struct AIChecklistGenerationSheet: View {
     @Environment(\.checklistGeneratorOverride) private var generatorOverride
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: LLMConfigurationStore
+    @EnvironmentObject private var proEntitlement: ProEntitlementStore
 
     @FocusState private var focusedField: FocusedField?
     @State private var topic = ""
@@ -36,14 +37,16 @@ struct AIChecklistGenerationSheet: View {
     @State private var errorMessage: String?
     @State private var canContinueWithoutWebSearch = false
     @State private var searchModeOverride: ChecklistSearchMode?
+    @State private var route: AIGenerationRoute = .managed
+    @State private var showsProPaywall = false
     @State private var showsSettings = false
     @State private var generationTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
             Group {
-                if !settings.isConfigured && generatorOverride == nil {
-                    missingConfigurationView
+                if showsProPaywall && requiresProEntitlement {
+                    ProPaywallView()
                 } else if hasResult {
                     resultForm
                 } else {
@@ -97,6 +100,20 @@ struct AIChecklistGenerationSheet: View {
 
     private var requestForm: some View {
         Form {
+            if generatorOverride == nil {
+                Section {
+                    Picker("AI Access", selection: $route) {
+                        ForEach(AIGenerationRoute.allCases) { route in
+                            Text(route.displayName).tag(route)
+                        }
+                    }
+                    .disabled(isGenerating)
+                    .accessibilityIdentifier("aiRoutePicker")
+                } footer: {
+                    Text(routeFooter)
+                }
+            }
+
             Section {
                 TextEditor(text: $topic)
                     .frame(minHeight: 150)
@@ -128,8 +145,10 @@ struct AIChecklistGenerationSheet: View {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
 
-                    Button("Modify AI Configuration") {
-                        openSettings()
+                    if route == .byok || generatorOverride != nil {
+                        Button("Modify AI Configuration") {
+                            openSettings()
+                        }
                     }
 
                     if canContinueWithoutWebSearch {
@@ -254,18 +273,6 @@ struct AIChecklistGenerationSheet: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var missingConfigurationView: some View {
-        ContentUnavailableView {
-            Label("AI Is Not Configured", systemImage: "sparkles")
-        } description: {
-            Text("Add a provider, model, and API Key in Settings before generating a checklist.")
-        } actions: {
-            Button("Open AI Settings", action: openSettings)
-                .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("openAISettingsButton")
-        }
-    }
-
     private var navigationTitle: LocalizedStringKey {
         mode == .create ? "Generate List with AI" : "Add Items with AI"
     }
@@ -285,8 +292,36 @@ struct AIChecklistGenerationSheet: View {
     }
 
     private var canGenerate: Bool {
-        mode == .supplement
-            || !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard mode == .supplement || !topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        return true
+    }
+
+    private var requiresProEntitlement: Bool {
+        generatorOverride == nil && !proEntitlement.isEntitled
+    }
+
+    private var managedServiceConfiguration: ManagedAIServiceConfiguration {
+        ManagedAIServiceConfiguration.fromBundle()
+    }
+
+    private var routeFooter: String {
+        switch route {
+        case .managed:
+            if managedServiceConfiguration.isConfigured {
+                return String(
+                    localized: "Pro includes up to 20 managed AI operations each calendar month. Internal retries do not use another operation."
+                )
+            }
+            return String(
+                localized: "Managed AI is unavailable until this build is connected to the product-owned service. You can use your own API Key instead."
+            )
+        case .byok:
+            return String(
+                localized: "Pro is required. Your API Key stays in this device's Keychain and BYOK operations do not use the managed monthly allowance."
+            )
+        }
     }
 
     private var request: ChecklistGenerationRequest {
@@ -333,62 +368,84 @@ struct AIChecklistGenerationSheet: View {
         errorMessage = nil
         canContinueWithoutWebSearch = false
         searchModeOverride = nil
-        guard settings.isConfigured else {
-            errorMessage = ChecklistGenerationError.configurationMissing.localizedDescription
+
+        guard generatorOverride != nil || proEntitlement.isEntitled else {
+            showsProPaywall = true
             return
+        }
+        if generatorOverride == nil {
+            switch route {
+            case .managed:
+                guard managedServiceConfiguration.isConfigured else {
+                    errorMessage = ChecklistGenerationError.managedServiceUnavailable.localizedDescription
+                    return
+                }
+            case .byok:
+                guard settings.isConfigured else {
+                    errorMessage = ChecklistGenerationError.configurationMissing.localizedDescription
+                    return
+                }
+            }
         }
         performGeneration()
     }
 
     private func performGeneration() {
-        do {
-            let generator: any ChecklistGenerating
-            if let generatorOverride {
-                generator = generatorOverride
-            } else {
-                generator = try ChecklistGenerationProviderFactory.make(
-                    source: .userConfigured,
-                    configuration: settings.configuration,
-                    apiKey: settings.apiKeyForRequest()
+        isGenerating = true
+        errorMessage = nil
+        canContinueWithoutWebSearch = false
+        generatedSources = []
+        didUseWebSearch = false
+        let currentRequest = request
+        let currentRoute = route
+        generationTask = Task {
+            do {
+                let generator = try await makeGenerator(for: currentRoute)
+                let result = try await generator.generate(request: currentRequest)
+                let draft = try AIResultNormalizer.normalize(
+                    result.draft,
+                    mode: mode,
+                    existingTitle: existingProject?.title,
+                    existingItems: existingProject?.items.map(\.title) ?? []
                 )
-            }
-
-            isGenerating = true
-            errorMessage = nil
-            canContinueWithoutWebSearch = false
-            generatedSources = []
-            didUseWebSearch = false
-            let currentRequest = request
-            generationTask = Task {
-                do {
-                    let result = try await generator.generate(request: currentRequest)
-                    let draft = try AIResultNormalizer.normalize(
-                        result.draft,
-                        mode: mode,
-                        existingTitle: existingProject?.title,
-                        existingItems: existingProject?.items.map(\.title) ?? []
-                    )
-                    guard !Task.isCancelled else { return }
-                    generatedTitle = draft.title
-                    generatedItemsText = draft.items.joined(separator: "\n")
-                    generatedSources = result.sources
-                    didUseWebSearch = result.didSearch
-                } catch is CancellationError {
-                    // Cancellation is an explicit user action and does not need an error alert.
-                } catch {
-                    isGenerating = false
-                    generationTask = nil
-                    errorMessage = error.localizedDescription
-                    canContinueWithoutWebSearch = (error as? ChecklistGenerationError)
-                        == .webSearchUnavailable
-                    return
-                }
+                guard !Task.isCancelled else { return }
+                generatedTitle = draft.title
+                generatedItemsText = draft.items.joined(separator: "\n")
+                generatedSources = result.sources
+                didUseWebSearch = result.didSearch
+            } catch is CancellationError {
+                // Cancellation is an explicit user action and does not need an error alert.
+            } catch {
                 isGenerating = false
                 generationTask = nil
+                errorMessage = error.localizedDescription
+                canContinueWithoutWebSearch = (error as? ChecklistGenerationError)
+                    == .webSearchUnavailable
+                return
             }
-        } catch {
             isGenerating = false
-            errorMessage = error.localizedDescription
+            generationTask = nil
+        }
+    }
+
+    private func makeGenerator(for route: AIGenerationRoute) async throws -> any ChecklistGenerating {
+        if let generatorOverride {
+            return generatorOverride
+        }
+
+        switch route {
+        case .managed:
+            let entitlementJWS = try await proEntitlement.signedEntitlementJWS()
+            return try ManagedAIChecklistGenerator(
+                configuration: managedServiceConfiguration,
+                entitlementJWS: entitlementJWS
+            )
+        case .byok:
+            return try ChecklistGenerationProviderFactory.make(
+                source: .userConfigured,
+                configuration: settings.configuration,
+                apiKey: settings.apiKeyForRequest()
+            )
         }
     }
 

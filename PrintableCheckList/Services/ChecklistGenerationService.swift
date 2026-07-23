@@ -137,6 +137,7 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
     case webSearchUnavailable
     case invalidResponse
     case managedServiceUnavailable
+    case managedMonthlyLimitReached
 
     var errorDescription: String? {
         switch self {
@@ -158,6 +159,8 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
             String(localized: "The AI service returned a result that could not be read. Please try again.")
         case .managedServiceUnavailable:
             String(localized: "The managed AI service is not available in this version.")
+        case .managedMonthlyLimitReached:
+            String(localized: "You have used all 20 managed AI operations for this calendar month.")
         }
     }
 }

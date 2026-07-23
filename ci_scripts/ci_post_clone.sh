@@ -5,6 +5,7 @@ project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 : "${SUPABASE_URL:?Set SUPABASE_URL in the Xcode Cloud workflow environment.}"
 : "${SUPABASE_PUBLISHABLE_KEY:?Set SUPABASE_PUBLISHABLE_KEY in the Xcode Cloud workflow environment.}"
+: "${MANAGED_AI_SERVICE_URL:?Set the Production managed-AI URL in the Xcode Cloud workflow environment.}"
 
 case "$SUPABASE_URL" in
     https://*) ;;
@@ -26,8 +27,19 @@ case "$SUPABASE_PUBLISHABLE_KEY" in
         ;;
 esac
 
+case "$MANAGED_AI_SERVICE_URL" in
+    https://*) ;;
+    *)
+        echo "MANAGED_AI_SERVICE_URL must use HTTPS." >&2
+        exit 1
+        ;;
+esac
+
 escaped_supabase_url="$(
     printf '%s' "$SUPABASE_URL" | sed 's#://#:/$()/#'
+)"
+escaped_managed_ai_service_url="$(
+    printf '%s' "$MANAGED_AI_SERVICE_URL" | sed 's#://#:/$()/#'
 )"
 development_team="${APPLE_DEVELOPMENT_TEAM:-Y5DR22VZYA}"
 local_config="$project_root/Config/Local.xcconfig"
@@ -38,6 +50,7 @@ umask 077
     printf 'DEVELOPMENT_TEAM = %s\n' "$development_team"
     printf 'SUPABASE_URL = %s\n' "$escaped_supabase_url"
     printf 'SUPABASE_PUBLISHABLE_KEY = %s\n' "$SUPABASE_PUBLISHABLE_KEY"
+    printf 'MANAGED_AI_PRODUCTION_SERVICE_URL = %s\n' "$escaped_managed_ai_service_url"
 } > "$local_config"
 
 if ! command -v xcodegen >/dev/null 2>&1; then

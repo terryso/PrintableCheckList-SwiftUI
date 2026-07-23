@@ -7,8 +7,8 @@ options:
   createIntermediateGroups: true
 
 configFiles:
-  Debug: Config/Base.xcconfig
-  Release: Config/Base.xcconfig
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
 
 settings:
   base:
@@ -43,6 +43,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_PUBLISHABLE_KEY: "$(SUPABASE_PUBLISHABLE_KEY)"
+        MANAGED_AI_SERVICE_URL: "$(MANAGED_AI_SERVICE_URL)"
     sources:
       - path: PrintableCheckList
         excludes:

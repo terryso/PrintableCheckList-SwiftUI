@@ -1,0 +1,9 @@
+#include "Base.xcconfig"
+
+// The checked-in Debug endpoint is the isolated Sandbox service. It contains
+// no credential; StoreKit JWS values are still verified by the service.
+MANAGED_AI_SANDBOX_SERVICE_URL = https:/$()/drqajgfborfvxdefbacb.supabase.co/functions/v1
+
+#include? "Local.xcconfig"
+
+MANAGED_AI_SERVICE_URL = $(MANAGED_AI_SANDBOX_SERVICE_URL)

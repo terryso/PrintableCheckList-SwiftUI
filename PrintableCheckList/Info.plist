@@ -20,6 +20,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MANAGED_AI_SERVICE_URL</key>
+	<string>$(MANAGED_AI_SERVICE_URL)</string>
 	<key>SUPABASE_PUBLISHABLE_KEY</key>
 	<string>$(SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>SUPABASE_URL</key>

@@ -28,7 +28,9 @@ struct SettingsView: View {
             } header: {
                 Text("AI Generation")
             } footer: {
-                Text("Use your own API Key to generate new lists or supplement existing ones.")
+                Text(
+                    "Pro is required to use AI. BYOK uses your API Key and does not use the managed monthly allowance."
+                )
             }
 
             Section {

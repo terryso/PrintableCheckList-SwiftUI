@@ -4,6 +4,7 @@ import SwiftUI
 struct PrintableCheckListApp: App {
     @StateObject private var store: ChecklistStore
     @StateObject private var aiSettings: LLMConfigurationStore
+    @StateObject private var proEntitlement: ProEntitlementStore
     private let generatorOverride: (any ChecklistGenerating)?
 
     init() {
@@ -47,6 +48,11 @@ struct PrintableCheckListApp: App {
                 credentialStore: credentialStore
             )
             _aiSettings = StateObject(wrappedValue: testAISettings)
+            _proEntitlement = StateObject(
+                wrappedValue: ProEntitlementStore(
+                    entitlementOverride: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
+                )
+            )
             if usesFlakyGenerator {
                 generatorOverride = UITestFlakyChecklistGenerator()
             } else if usesSlowGenerator {
@@ -62,6 +68,7 @@ struct PrintableCheckListApp: App {
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             _store = StateObject(wrappedValue: ChecklistStore())
             _aiSettings = StateObject(wrappedValue: LLMConfigurationStore())
+            _proEntitlement = StateObject(wrappedValue: ProEntitlementStore())
             generatorOverride = nil
             return
         }
@@ -74,6 +81,7 @@ struct PrintableCheckListApp: App {
             )
         )
         _aiSettings = StateObject(wrappedValue: LLMConfigurationStore())
+        _proEntitlement = StateObject(wrappedValue: ProEntitlementStore())
         generatorOverride = nil
     }
 
@@ -82,8 +90,10 @@ struct PrintableCheckListApp: App {
             HomeView()
                 .environmentObject(store)
                 .environmentObject(aiSettings)
+                .environmentObject(proEntitlement)
                 .environment(\.checklistGeneratorOverride, generatorOverride)
                 .task {
+                    proEntitlement.start()
                     await store.startSyncServices()
                 }
         }
