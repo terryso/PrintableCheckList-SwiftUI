@@ -39,6 +39,7 @@ struct PreviewView: View {
         .background(.white)
         .foregroundStyle(.black)
         .navigationTitle(Text("Preview"))
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let project = store.project(id: projectID) {
                 ToolbarItem(placement: .topBarTrailing) {
