@@ -47,7 +47,7 @@ class PublicError extends Error {
   }
 }
 
-Deno.serve(async (request) => {
+export async function managedAIHandler(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -89,15 +89,30 @@ Deno.serve(async (request) => {
     }
 
     try {
-      const response = await generateChecklist(payload, configuration);
+      throwIfAborted(request.signal);
+      const response = await generateChecklist(
+        payload,
+        configuration,
+        request.signal,
+      );
+      throwIfAborted(request.signal);
       const storedResponse = await completeOperation(
         supabase,
         payload.operationID,
         response,
       );
+      throwIfAborted(request.signal);
       return jsonResponse(requireStoredResponse(storedResponse));
     } catch (error) {
-      await releaseOperation(supabase, payload.operationID, failureCode(error));
+      const wasCancelled = request.signal.aborted || isAbortError(error);
+      await releaseOperation(
+        supabase,
+        payload.operationID,
+        wasCancelled ? "operation_cancelled" : failureCode(error),
+      );
+      if (wasCancelled) {
+        throw new PublicError(503, "operation_cancelled");
+      }
       throw error;
     }
   } catch (error) {
@@ -113,7 +128,11 @@ Deno.serve(async (request) => {
     }
     return errorResponse(error);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(managedAIHandler);
+}
 
 async function readPayload(request: Request): Promise<ManagedAIRequest> {
   const body = await request.text();
@@ -302,15 +321,14 @@ async function releaseOperation(
     p_failure_code: code,
   });
   if (error) {
-    console.error("managed-ai-checklists could not release reservation", {
-      operationID,
-    });
+    throw new PublicError(503, "usage_ledger_unavailable");
   }
 }
 
 async function generateChecklist(
   request: ManagedAIRequest,
   configuration: RuntimeConfiguration,
+  signal: AbortSignal,
 ): Promise<ManagedAIResponse> {
   const endpoint = new URL(
     "chat/completions",
@@ -325,6 +343,7 @@ async function generateChecklist(
         Authorization: `Bearer ${configuration.providerAPIKey}`,
         "Content-Type": "application/json",
       },
+      signal,
       body: JSON.stringify({
         model: configuration.providerModel,
         temperature: 0.2,
@@ -447,10 +466,21 @@ function requiredTransactionField(
 
 function failureCode(error: unknown): string {
   if (error instanceof PublicError) return error.code;
+  if (isAbortError(error)) return "operation_cancelled";
   if (error instanceof RequestValidationError) {
     return "invalid_provider_response";
   }
   return "internal_failure";
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw new PublicError(503, "operation_cancelled");
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function errorResponse(error: unknown): Response {

@@ -19,6 +19,9 @@ struct PrintableCheckListApp: App {
             let usesSlowGenerator = ProcessInfo.processInfo.arguments.contains(
                 "-useSlowAIGeneratorForUITests"
             )
+            let usesManagedOperationRetryGenerator = ProcessInfo.processInfo.arguments.contains(
+                "-useManagedOperationRetryGeneratorForUITests"
+            )
             let testFileURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PrintableCheckList-UITests.json")
             try? FileManager.default.removeItem(at: testFileURL)
@@ -40,6 +43,7 @@ struct PrintableCheckListApp: App {
             )
             let credentialStore = InMemoryLLMCredentialStore(
                 apiKey: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
+                    || usesManagedOperationRetryGenerator
                     ? "ui-test-key"
                     : nil
             )
@@ -51,9 +55,12 @@ struct PrintableCheckListApp: App {
             _proEntitlement = StateObject(
                 wrappedValue: ProEntitlementStore(
                     entitlementOverride: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
+                        || usesManagedOperationRetryGenerator
                 )
             )
-            if usesFlakyGenerator {
+            if usesManagedOperationRetryGenerator {
+                generatorOverride = UITestManagedOperationRetryGenerator()
+            } else if usesFlakyGenerator {
                 generatorOverride = UITestFlakyChecklistGenerator()
             } else if usesSlowGenerator {
                 generatorOverride = UITestSlowChecklistGenerator()

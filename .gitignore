@@ -5,3 +5,4 @@ DerivedData/
 xcuserdata/
 PrintableCheckList.xcodeproj/
 Config/Local.xcconfig
+Supabase/functions/managed-ai-checklists/node_modules/

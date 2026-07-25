@@ -1,10 +1,11 @@
 {
+  "nodeModulesDir": "auto",
   "compilerOptions": {
     "lib": ["deno.ns", "dom", "dom.iterable"],
     "strict": true
   },
   "tasks": {
     "check": "deno check index.ts",
-    "test": "deno test domain_test.ts"
+    "test": "deno test --allow-env --allow-net domain_test.ts index_test.ts"
   }
 }

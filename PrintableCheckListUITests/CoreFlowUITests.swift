@@ -247,6 +247,32 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertEqual(app.textFields["aiGeneratedTitleField"].value as? String, "Retry List")
     }
 
+    func testManagedAIGenerationRetryReusesTheOperationID() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useManagedOperationRetryGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Retry managed operation")
+        app.buttons["generateChecklistButton"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts[
+                "The AI service is temporarily unavailable. Please try again later."
+            ].waitForExistence(timeout: 5)
+        )
+
+        app.buttons["generateChecklistButton"].tap()
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.textFields["aiGeneratedTitleField"].value as? String,
+            "Managed Retry List"
+        )
+    }
+
     func testAIGenerationCanBeCancelledWithoutLosingInput() {
         app.terminate()
         app = makeApp(additionalArguments: ["-useSlowAIGeneratorForUITests"])

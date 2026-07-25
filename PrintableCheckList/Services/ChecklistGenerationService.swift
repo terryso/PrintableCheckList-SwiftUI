@@ -120,6 +120,19 @@ struct ChecklistGenerationResult: Equatable, Sendable {
 
 protocol ChecklistGenerating {
     func generate(request: ChecklistGenerationRequest) async throws -> ChecklistGenerationResult
+    func generate(
+        request: ChecklistGenerationRequest,
+        operationID: UUID
+    ) async throws -> ChecklistGenerationResult
+}
+
+extension ChecklistGenerating {
+    func generate(
+        request: ChecklistGenerationRequest,
+        operationID: UUID
+    ) async throws -> ChecklistGenerationResult {
+        try await generate(request: request)
+    }
 }
 
 enum ChecklistGenerationProviderSource {
@@ -138,6 +151,7 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
     case invalidResponse
     case managedServiceUnavailable
     case managedMonthlyLimitReached
+    case managedOperationInProgress
 
     var errorDescription: String? {
         switch self {
@@ -161,6 +175,8 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
             String(localized: "The managed AI service is not available in this version.")
         case .managedMonthlyLimitReached:
             String(localized: "You have used all 20 managed AI operations for this calendar month.")
+        case .managedOperationInProgress:
+            String(localized: "Your previous managed AI request is still processing. Please wait a moment and try again.")
         }
     }
 }
@@ -573,6 +589,34 @@ actor UITestFlakyChecklistGenerator: ChecklistGenerating {
                 items: ["Recovered item"]
             )
         )
+    }
+}
+
+actor UITestManagedOperationRetryGenerator: ChecklistGenerating {
+    private var retryOperationID: UUID?
+
+    func generate(request: ChecklistGenerationRequest) async throws -> ChecklistGenerationResult {
+        throw ChecklistGenerationError.invalidResponse
+    }
+
+    func generate(
+        request: ChecklistGenerationRequest,
+        operationID: UUID
+    ) async throws -> ChecklistGenerationResult {
+        if let retryOperationID {
+            guard retryOperationID == operationID else {
+                throw ChecklistGenerationError.invalidResponse
+            }
+            return ChecklistGenerationResult(
+                draft: GeneratedChecklistDraft(
+                    title: "Managed Retry List",
+                    items: ["Recovered item"]
+                )
+            )
+        }
+
+        retryOperationID = operationID
+        throw ChecklistGenerationError.serviceUnavailable
     }
 }
 

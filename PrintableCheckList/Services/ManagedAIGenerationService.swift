@@ -105,7 +105,41 @@ final class ManagedAIChecklistGenerator: ChecklistGenerating {
     }
 
     func generate(request: ChecklistGenerationRequest) async throws -> ChecklistGenerationResult {
-        let operationID = UUID()
+        try await generate(request: request, operationID: UUID())
+    }
+
+    func generate(
+        request: ChecklistGenerationRequest,
+        operationID: UUID
+    ) async throws -> ChecklistGenerationResult {
+        var shouldRetryNetworkFailure = true
+
+        while true {
+            do {
+                return try await send(request: request, operationID: operationID)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as URLError where shouldRetryNetworkFailure && error.code != .cancelled {
+                shouldRetryNetworkFailure = false
+                continue
+            } catch let error as ChecklistGenerationError {
+                throw error
+            } catch let error as ProEntitlementError {
+                throw error
+            } catch let error as URLError where error.code == .timedOut {
+                throw ChecklistGenerationError.timedOut
+            } catch is URLError {
+                throw ChecklistGenerationError.serviceUnavailable
+            } catch {
+                throw ChecklistGenerationError.serviceUnavailable
+            }
+        }
+    }
+
+    private func send(
+        request: ChecklistGenerationRequest,
+        operationID: UUID
+    ) async throws -> ChecklistGenerationResult {
         var urlRequest = URLRequest(url: endpoint)
         urlRequest.httpMethod = "POST"
         urlRequest.timeoutInterval = 45
@@ -120,35 +154,21 @@ final class ManagedAIChecklistGenerator: ChecklistGenerating {
             )
         )
 
-        do {
-            let (data, response) = try await session.data(for: urlRequest)
-            try Task.checkCancellation()
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw ChecklistGenerationError.invalidResponse
-            }
-            guard (200..<300).contains(httpResponse.statusCode) else {
-                throw mappedError(statusCode: httpResponse.statusCode, data: data)
-            }
-
-            let managedResponse = try decoder.decode(ManagedAIResponse.self, from: data)
-            return ChecklistGenerationResult(
-                draft: managedResponse.draft,
-                sources: managedResponse.sources,
-                didSearch: managedResponse.didSearch
-            )
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch let error as ChecklistGenerationError {
-            throw error
-        } catch let error as ProEntitlementError {
-            throw error
-        } catch let error as URLError where error.code == .timedOut {
-            throw ChecklistGenerationError.timedOut
-        } catch is URLError {
-            throw ChecklistGenerationError.serviceUnavailable
-        } catch {
-            throw ChecklistGenerationError.serviceUnavailable
+        let (data, response) = try await session.data(for: urlRequest)
+        try Task.checkCancellation()
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ChecklistGenerationError.invalidResponse
         }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw mappedError(statusCode: httpResponse.statusCode, data: data)
+        }
+
+        let managedResponse = try decoder.decode(ManagedAIResponse.self, from: data)
+        return ChecklistGenerationResult(
+            draft: managedResponse.draft,
+            sources: managedResponse.sources,
+            didSearch: managedResponse.didSearch
+        )
     }
 
     private func mappedError(statusCode: Int, data: Data) -> Error {
@@ -160,6 +180,8 @@ final class ManagedAIChecklistGenerator: ChecklistGenerating {
             switch response.code {
             case "monthly_limit_reached":
                 return ChecklistGenerationError.managedMonthlyLimitReached
+            case "operation_in_progress":
+                return ChecklistGenerationError.managedOperationInProgress
             case "managed_web_search_unavailable":
                 return ChecklistGenerationError.webSearchUnavailable
             case "entitlement_invalid":

@@ -152,6 +152,51 @@ final class AIGenerationTests: XCTestCase {
         XCTAssertFalse(result.didSearch)
     }
 
+    func testManagedGeneratorRetriesNetworkFailureWithTheSameOperationID() async throws {
+        let requestLock = NSLock()
+        var operationIDs: [String] = []
+
+        URLProtocolStub.setHandler { request in
+            let operationID = try XCTUnwrap(request.value(forHTTPHeaderField: "Idempotency-Key"))
+            let payload = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: Self.bodyData(from: request)) as? [String: Any]
+            )
+            XCTAssertEqual(payload["operation_id"] as? String, operationID)
+
+            requestLock.lock()
+            operationIDs.append(operationID)
+            let attempt = operationIDs.count
+            requestLock.unlock()
+
+            if attempt == 1 {
+                return .failure(URLError(.networkConnectionLost))
+            }
+            return .response(
+                status: 200,
+                data: Data(
+                    #"{"draft":{"title":"Family Trip","items":["Passport"]},"sources":[],"did_search":false}"#
+                        .utf8
+                )
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        let result = try await generator.generate(request: Self.createRequest)
+
+        XCTAssertEqual(result.draft, GeneratedChecklistDraft(title: "Family Trip", items: ["Passport"]))
+        XCTAssertEqual(operationIDs.count, 2)
+        XCTAssertEqual(operationIDs.first, operationIDs.last)
+    }
+
     func testManagedGeneratorReportsInvalidServerEntitlementAsVerificationFailure() async throws {
         URLProtocolStub.setHandler { _ in
             .response(
@@ -177,6 +222,32 @@ final class AIGenerationTests: XCTestCase {
             XCTFail("Expected the server entitlement rejection to throw")
         } catch {
             XCTAssertEqual(error as? ProEntitlementError, .unverifiedTransaction)
+        }
+    }
+
+    func testManagedGeneratorReportsAnActiveOperationAsInProgress() async throws {
+        URLProtocolStub.setHandler { _ in
+            .response(
+                status: 409,
+                data: Data(#"{"code":"operation_in_progress"}"#.utf8)
+            )
+        }
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolStub.self]
+        let generator = try ManagedAIChecklistGenerator(
+            configuration: ManagedAIServiceConfiguration(
+                baseURL: try XCTUnwrap(URL(string: "https://managed.example.com/functions/v1"))
+            ),
+            entitlementJWS: "verified-storekit-jws",
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        do {
+            _ = try await generator.generate(request: Self.createRequest)
+            XCTFail("Expected the active managed operation to throw")
+        } catch {
+            XCTAssertEqual(error as? ChecklistGenerationError, .managedOperationInProgress)
         }
     }
 

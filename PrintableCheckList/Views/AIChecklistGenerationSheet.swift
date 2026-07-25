@@ -18,6 +18,11 @@ struct AIChecklistGenerationSheet: View {
         case generatedItems
     }
 
+    private struct PendingManagedOperation: Equatable {
+        let request: ChecklistGenerationRequest
+        let operationID: UUID
+    }
+
     let mode: ChecklistGenerationMode
     let existingProject: ChecklistProject?
     let onSave: (GeneratedChecklistDraft) -> Void
@@ -41,6 +46,7 @@ struct AIChecklistGenerationSheet: View {
     @State private var showsProPaywall = false
     @State private var showsSettings = false
     @State private var generationTask: Task<Void, Never>?
+    @State private var pendingManagedOperation: PendingManagedOperation?
 
     var body: some View {
         NavigationStack {
@@ -398,10 +404,22 @@ struct AIChecklistGenerationSheet: View {
         didUseWebSearch = false
         let currentRequest = request
         let currentRoute = route
+        let operationID = managedOperationID(
+            for: currentRequest,
+            route: currentRoute
+        )
         generationTask = Task {
             do {
                 let generator = try await makeGenerator(for: currentRoute)
-                let result = try await generator.generate(request: currentRequest)
+                let result: ChecklistGenerationResult
+                if let operationID {
+                    result = try await generator.generate(
+                        request: currentRequest,
+                        operationID: operationID
+                    )
+                } else {
+                    result = try await generator.generate(request: currentRequest)
+                }
                 let draft = try AIResultNormalizer.normalize(
                     result.draft,
                     mode: mode,
@@ -413,6 +431,7 @@ struct AIChecklistGenerationSheet: View {
                 generatedItemsText = draft.items.joined(separator: "\n")
                 generatedSources = result.sources
                 didUseWebSearch = result.didSearch
+                pendingManagedOperation = nil
             } catch is CancellationError {
                 // Cancellation is an explicit user action and does not need an error alert.
             } catch {
@@ -426,6 +445,27 @@ struct AIChecklistGenerationSheet: View {
             isGenerating = false
             generationTask = nil
         }
+    }
+
+    private func managedOperationID(
+        for request: ChecklistGenerationRequest,
+        route: AIGenerationRoute
+    ) -> UUID? {
+        guard route == .managed else {
+            pendingManagedOperation = nil
+            return nil
+        }
+        if let pendingManagedOperation,
+           pendingManagedOperation.request == request {
+            return pendingManagedOperation.operationID
+        }
+
+        let operationID = UUID()
+        pendingManagedOperation = PendingManagedOperation(
+            request: request,
+            operationID: operationID
+        )
+        return operationID
     }
 
     private func makeGenerator(for route: AIGenerationRoute) async throws -> any ChecklistGenerating {
