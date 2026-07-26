@@ -792,6 +792,39 @@ final class AIGenerationTests: XCTestCase {
         XCTAssertTrue(result.sources.isEmpty)
     }
 
+    func testOffModeNeverSearchesEvenForADynamicTopic() async throws {
+        let session = makeSession()
+        var requestCount = 0
+        URLProtocolStub.setHandler { request in
+            requestCount += 1
+            XCTAssertTrue(request.url?.path.hasSuffix("/chat/completions") == true)
+            return .response(status: 200, data: Self.successData)
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: .default,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try GLMWebSearchResearcher(
+            baseURL: LLMProviderPreset.glm.defaultBaseURL,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .off
+        )
+
+        let result = try await generator.generate(
+            request: Self.createRequest(withTopic: "Latest exchange rates and today news")
+        )
+
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertFalse(result.didSearch)
+        XCTAssertTrue(result.sources.isEmpty)
+    }
+
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [URLProtocolStub.self]

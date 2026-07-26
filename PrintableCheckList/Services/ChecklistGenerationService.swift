@@ -549,8 +549,8 @@ struct UITestChecklistGenerator: ChecklistGenerating {
                     ChecklistSource(
                         title: "Example travel source",
                         url: URL(string: "https://example.com/travel")!,
-                        snippet: nil,
-                        publishedDate: nil
+                        snippet: "Check the latest weather and visa rules before departure.",
+                        publishedDate: "2026-07-22"
                     )
                 ],
                 didSearch: true
@@ -627,6 +627,24 @@ struct UITestSlowChecklistGenerator: ChecklistGenerating {
             draft: GeneratedChecklistDraft(
                 title: "Slow AI List",
                 items: ["Slow item"]
+            )
+        )
+    }
+}
+
+/// Simulates a BYOK provider whose web search is unavailable on the first
+/// attempt, then succeeds only after the user continues without web search
+/// (i.e. once the request carries an explicit `.off` search-mode override).
+struct UITestWebSearchUnavailableChecklistGenerator: ChecklistGenerating {
+    func generate(request: ChecklistGenerationRequest) async throws -> ChecklistGenerationResult {
+        try await Task.sleep(for: .milliseconds(150))
+        guard request.searchModeOverride == .off else {
+            throw ChecklistGenerationError.webSearchUnavailable
+        }
+        return ChecklistGenerationResult(
+            draft: GeneratedChecklistDraft(
+                title: "Unchecked AI List",
+                items: ["Item generated without web search"]
             )
         )
     }

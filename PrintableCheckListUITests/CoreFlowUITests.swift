@@ -294,6 +294,83 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertFalse(app.textViews["aiGeneratedItemsEditor"].exists)
     }
 
+    func testBYOKWebSearchResultShowsSourceDateAndSummary() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useFakeAIGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Winter trip")
+        app.buttons["generateChecklistButton"].tap()
+
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["aiSourcesSection"].waitForExistence(timeout: 3)
+        )
+
+        let publishedDate = app.staticTexts["2026-07-22"]
+        XCTAssertTrue(
+            publishedDate.waitForExistence(timeout: 2),
+            "BYOK web-search sources must show the published date when available."
+        )
+
+        let summary = app.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS %@", "visa rules")
+        ).firstMatch
+        XCTAssertTrue(
+            summary.waitForExistence(timeout: 2),
+            "BYOK web-search sources must show the source summary when available."
+        )
+    }
+
+    func testManagedRouteExplainsNoWebSearchBoundary() {
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        XCTAssertTrue(app.textViews["aiTopicEditor"].waitForExistence(timeout: 3))
+
+        // Managed AI is the default route; its footer must state explicitly that
+        // it does not perform web search or online fact-checking.
+        let boundary = app.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS %@", "Managed AI does not search the web")
+        ).firstMatch
+        XCTAssertTrue(
+            boundary.waitForExistence(timeout: 3),
+            "The managed AI route must disclose that it does not search the web."
+        )
+    }
+
+    func testContinuingWithoutWebSearchMarksResultAsNotFactChecked() {
+        app.terminate()
+        app = makeApp(additionalArguments: ["-useWebSearchUnavailableGeneratorForUITests"])
+        app.launch()
+
+        app.buttons["newListButton"].tap()
+        app.buttons["Generate with AI"].tap()
+        let topicEditor = app.textViews["aiTopicEditor"]
+        XCTAssertTrue(topicEditor.waitForExistence(timeout: 3))
+        topicEditor.typeText("Latest visa rules")
+        app.buttons["generateChecklistButton"].tap()
+
+        let continueButton = app.buttons["continueWithoutWebSearchButton"]
+        XCTAssertTrue(
+            continueButton.waitForExistence(timeout: 5),
+            "Web search failure must offer a way to continue without web search."
+        )
+        continueButton.tap()
+
+        XCTAssertTrue(app.textViews["aiGeneratedItemsEditor"].waitForExistence(timeout: 5))
+
+        let notice = app.descendants(matching: .any)["aiNotFactCheckedNotice"]
+        XCTAssertTrue(
+            notice.waitForExistence(timeout: 3),
+            "A result produced after continuing without web search must be marked as not fact-checked."
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["aiSourcesSection"].exists)
+    }
+
     private func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
         let application = XCUIApplication()
         application.launchArguments = [

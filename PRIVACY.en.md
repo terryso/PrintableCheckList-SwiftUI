@@ -18,6 +18,7 @@ AI generation is an optional Pro feature. Pro is a one-time purchase that includ
 - To enforce the monthly allowance and request idempotency, Supabase stores the App Store original transaction identifier, Sandbox or Production environment, first-operation time zone, operation identifier, calendar month, processing state, and completed generated response. The original request body and StoreKit JWS are not written to these allowance tables. A generated response may contain checklist content related to the user's input.
 - Unexpected service-error logs contain only the operation identifier and error category, not the request body, JWS, topic, or model credentials.
 - Managed-AI data is processed by the developer-configured Supabase service, transaction verifier, and model provider, each under its applicable terms and privacy policy. The user may request deletion of managed-AI-associated data using the contact information below. Later use may recreate allowance records after deletion.
+- Managed AI does not perform web search or online fact-checking. Only BYOK with a supported provider (GLM or OpenAI) can search the web for current facts and return reference sources.
 
 ### Bring Your Own Key (BYOK)
 

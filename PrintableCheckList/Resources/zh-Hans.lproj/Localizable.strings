@@ -145,9 +145,9 @@
 "Managed AI" = "托管 AI";
 "Use Your Own API Key" = "使用你自己的 API Key";
 "AI Access" = "AI 使用方式";
-"Pro includes up to 20 managed AI operations each calendar month. Internal retries do not use another operation." = "Pro 每个自然月包含最多 20 次托管 AI 操作。内部重试不会额外占用操作次数。";
-"Managed AI is unavailable until this build is connected to the product-owned service. You can use your own API Key instead." = "在此构建连接到产品自有服务之前，托管 AI 不可用；你可以改用自己的 API Key。";
-"Pro is required. Your API Key stays in this device's Keychain and BYOK operations do not use the managed monthly allowance." = "使用 AI 需要解锁 Pro。你的 API Key 保存在本设备的钥匙串中，BYOK 操作不会占用托管 AI 的每月额度。";
+"Pro includes up to 20 managed AI operations each calendar month. Managed AI does not search the web or perform online fact-checking; only your own API Key with a supported provider can search the web. Internal retries do not use another operation." = "Pro 每个自然月包含最多 20 次托管 AI 操作。托管 AI 不进行联网搜索或联网事实核查；只有自带 API Key 且使用受支持的服务商时才能联网搜索。内部重试不会额外占用操作次数。";
+"Managed AI is unavailable until this build is connected to the product-owned service. Managed AI does not search the web or perform online fact-checking; only your own API Key with a supported provider can search the web." = "在此构建连接到产品自有服务之前，托管 AI 不可用。托管 AI 不进行联网搜索或联网事实核查；只有自带 API Key 且使用受支持的服务商时才能联网搜索。";
+"Pro is required. Your API Key stays in this device's Keychain. Supported providers (GLM, OpenAI) can search the web for current facts and show sources, and BYOK operations do not use the managed monthly allowance." = "使用 AI 需要解锁 Pro。你的 API Key 保存在本设备的钥匙串中。受支持的服务商（GLM、OpenAI）可联网搜索时效性资料并展示来源，BYOK 操作不会占用托管 AI 的每月额度。";
 "Pro is required to use AI. BYOK uses your API Key and does not use the managed monthly allowance." = "使用 AI 需要解锁 Pro。BYOK 使用你的 API Key，不会占用托管 AI 的每月额度。";
 "Unlock Pro to Use AI" = "解锁 Pro 以使用 AI";
 "Pro is a one-time purchase. It includes up to 20 managed AI operations per calendar month and use of your own API Key." = "Pro 一次性购买后，可在每个自然月使用最多 20 次托管 AI 操作，也可使用你自己的 API Key。";
@@ -189,7 +189,8 @@
 "Sources" = "参考来源";
 "Web search was used for this result." = "本次结果使用了联网搜索。";
 "Opens the source in your browser" = "在浏览器中打开来源";
-"Sources are provided for reference and are not saved in the checklist." = "来源仅供参考，不会保存到清单中。";
+"Sources are for verification only, not a guarantee of correctness, and are not saved in the checklist." = "来源仅供核查，并非正确性保证，也不会保存到清单中。";
+"This result was generated without web search and was not fact-checked online." = "本次结果未联网搜索，未进行联网核查。";
 "A4" = "A4";
 "Letter" = "Letter";
 "Paper Size" = "纸张尺寸";

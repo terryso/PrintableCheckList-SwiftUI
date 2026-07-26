@@ -41,6 +41,7 @@ struct AIChecklistGenerationSheet: View {
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var canContinueWithoutWebSearch = false
+    @State private var resultMarkedNotFactChecked = false
     @State private var searchModeOverride: ChecklistSearchMode?
     @State private var route: AIGenerationRoute = .managed
     @State private var showsProPaywall = false
@@ -160,7 +161,7 @@ struct AIChecklistGenerationSheet: View {
                     if canContinueWithoutWebSearch {
                         Button("Continue Without Web Search") {
                             searchModeOverride = .off
-                            performGeneration()
+                            performGeneration(skippedWebSearch: true)
                         }
                         .accessibilityIdentifier("continueWithoutWebSearchButton")
                     }
@@ -241,6 +242,17 @@ struct AIChecklistGenerationSheet: View {
                                     Text(source.url.host ?? source.url.absoluteString)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                    if let publishedDate = source.publishedDate {
+                                        Text(publishedDate)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let snippet = source.snippet {
+                                        Text(snippet)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(3)
+                                    }
                                 }
                             }
                             .accessibilityHint(Text("Opens the source in your browser"))
@@ -249,9 +261,18 @@ struct AIChecklistGenerationSheet: View {
                 } header: {
                     Text("Sources")
                 } footer: {
-                    Text("Sources are provided for reference and are not saved in the checklist.")
+                    Text("Sources are for verification only, not a guarantee of correctness, and are not saved in the checklist.")
                 }
                 .accessibilityIdentifier("aiSourcesSection")
+            } else if resultMarkedNotFactChecked {
+                Section {
+                    Label(
+                        "This result was generated without web search and was not fact-checked online.",
+                        systemImage: "exclamationmark.bubble"
+                    )
+                    .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("aiNotFactCheckedNotice")
             }
 
             Section {
@@ -317,15 +338,15 @@ struct AIChecklistGenerationSheet: View {
         case .managed:
             if managedServiceConfiguration.isConfigured {
                 return String(
-                    localized: "Pro includes up to 20 managed AI operations each calendar month. Internal retries do not use another operation."
+                    localized: "Pro includes up to 20 managed AI operations each calendar month. Managed AI does not search the web or perform online fact-checking; only your own API Key with a supported provider can search the web. Internal retries do not use another operation."
                 )
             }
             return String(
-                localized: "Managed AI is unavailable until this build is connected to the product-owned service. You can use your own API Key instead."
+                localized: "Managed AI is unavailable until this build is connected to the product-owned service. Managed AI does not search the web or perform online fact-checking; only your own API Key with a supported provider can search the web."
             )
         case .byok:
             return String(
-                localized: "Pro is required. Your API Key stays in this device's Keychain and BYOK operations do not use the managed monthly allowance."
+                localized: "Pro is required. Your API Key stays in this device's Keychain. Supported providers (GLM, OpenAI) can search the web for current facts and show sources, and BYOK operations do not use the managed monthly allowance."
             )
         }
     }
@@ -396,10 +417,11 @@ struct AIChecklistGenerationSheet: View {
         performGeneration()
     }
 
-    private func performGeneration() {
+    private func performGeneration(skippedWebSearch: Bool = false) {
         isGenerating = true
         errorMessage = nil
         canContinueWithoutWebSearch = false
+        resultMarkedNotFactChecked = skippedWebSearch
         generatedSources = []
         didUseWebSearch = false
         let currentRequest = request

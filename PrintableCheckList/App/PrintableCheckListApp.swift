@@ -22,6 +22,9 @@ struct PrintableCheckListApp: App {
             let usesManagedOperationRetryGenerator = ProcessInfo.processInfo.arguments.contains(
                 "-useManagedOperationRetryGeneratorForUITests"
             )
+            let usesWebSearchUnavailableGenerator = ProcessInfo.processInfo.arguments.contains(
+                "-useWebSearchUnavailableGeneratorForUITests"
+            )
             let testFileURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PrintableCheckList-UITests.json")
             try? FileManager.default.removeItem(at: testFileURL)
@@ -50,11 +53,13 @@ struct PrintableCheckListApp: App {
                 )
             }
             _store = StateObject(wrappedValue: testStore)
+            let usesAnyUITestGenerator = usesFakeGenerator
+                || usesFlakyGenerator
+                || usesSlowGenerator
+                || usesManagedOperationRetryGenerator
+                || usesWebSearchUnavailableGenerator
             let credentialStore = InMemoryLLMCredentialStore(
-                apiKey: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
-                    || usesManagedOperationRetryGenerator
-                    ? "ui-test-key"
-                    : nil
+                apiKey: usesAnyUITestGenerator ? "ui-test-key" : nil
             )
             let testAISettings = LLMConfigurationStore(
                 userDefaults: testDefaults,
@@ -63,8 +68,7 @@ struct PrintableCheckListApp: App {
             _aiSettings = StateObject(wrappedValue: testAISettings)
             _proEntitlement = StateObject(
                 wrappedValue: ProEntitlementStore(
-                    entitlementOverride: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
-                        || usesManagedOperationRetryGenerator
+                    entitlementOverride: usesAnyUITestGenerator
                 )
             )
             if usesManagedOperationRetryGenerator {
@@ -73,6 +77,8 @@ struct PrintableCheckListApp: App {
                 generatorOverride = UITestFlakyChecklistGenerator()
             } else if usesSlowGenerator {
                 generatorOverride = UITestSlowChecklistGenerator()
+            } else if usesWebSearchUnavailableGenerator {
+                generatorOverride = UITestWebSearchUnavailableChecklistGenerator()
             } else if usesFakeGenerator {
                 generatorOverride = UITestChecklistGenerator()
             } else {
