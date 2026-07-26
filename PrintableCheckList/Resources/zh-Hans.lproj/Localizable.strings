@@ -75,6 +75,7 @@
 "Organize" = "整理";
 "Preview Checklist" = "预览清单";
 "Preview the printable checklist" = "预览可打印清单";
+"Preview, export and print the print-ready checklist" = "预览、导出和打印打印就绪清单";
 "Privacy" = "隐私";
 "Reorder and delete" = "重新排序和删除";
 "Share Checklist Content for Product Analytics" = "共享清单内容用于产品统计";
@@ -168,3 +169,15 @@
 "Web search was used for this result." = "本次结果使用了联网搜索。";
 "Opens the source in your browser" = "在浏览器中打开来源";
 "Sources are provided for reference and are not saved in the checklist." = "来源仅供参考，不会保存到清单中。";
+"A4" = "A4";
+"Letter" = "Letter";
+"Paper Size" = "纸张尺寸";
+"%ld page" = "%ld 页";
+"%ld pages" = "%ld 页";
+"Export PDF" = "导出 PDF";
+"Save or share the print-ready PDF" = "保存或分享打印就绪 PDF";
+"Choose the paper size and print from the preview" = "在预览中选择纸张尺寸并打印";
+"Unable to Create PDF" = "无法生成 PDF";
+"Checklist" = "清单";
+"%ld item does not fit on two pages. Shorten or remove items, or split this list." = "有 %ld 个清单项放不进两页。请缩短或删除部分清单项，或把清单拆成两份。";
+"%ld items do not fit on two pages. Shorten or remove items, or split this list." = "有 %ld 个清单项放不进两页。请缩短或删除部分清单项，或把清单拆成两份。";

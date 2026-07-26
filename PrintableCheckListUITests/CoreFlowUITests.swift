@@ -32,7 +32,6 @@ final class CoreFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Eggs"].exists)
         XCTAssertTrue(app.buttons["addItemsButton"].exists)
         XCTAssertTrue(app.buttons["previewButton"].exists)
-        XCTAssertTrue(app.buttons["printButton"].exists)
         XCTAssertFalse(app.images["square"].exists)
 
         app.buttons["Milk"].tap()
@@ -47,8 +46,11 @@ final class CoreFlowUITests: XCTestCase {
 
         app.buttons["previewButton"].tap()
         XCTAssertTrue(app.navigationBars["Preview"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Oat Milk"].exists)
+        let preview = app.descendants(matching: .any)["printablePDFView"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertTrue(preview.label.contains("Oat Milk"))
         XCTAssertTrue(app.buttons["previewPrintButton"].exists)
+        XCTAssertTrue(app.buttons["previewExportPDFButton"].exists)
 
         app.navigationBars["Preview"].buttons.firstMatch.tap()
         app.navigationBars["Weekend Shopping"].buttons.firstMatch.tap()

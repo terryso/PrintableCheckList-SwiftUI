@@ -1,68 +1,41 @@
 import UIKit
 
-enum PrintHTMLBuilder {
-    static func html(for project: ChecklistProject) -> String {
-        let rows = project.items.map { item in
-            """
-            <div class="item"><span class="checkbox"></span><span>\(escape(item.title))</span></div>
-            """
-        }.joined()
-
-        return """
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body { font-family: -apple-system, sans-serif; margin: 0; }
-            h1 { font-size: 32px; line-height: 40px; margin: 0 0 18px 0; }
-            .item { min-height: 28px; font-size: 16px; line-height: 28px; padding-left: 35px; margin-bottom: 12px; }
-            .item:last-child { margin-bottom: 0; }
-            .checkbox { box-sizing: border-box; display: block; float: left; width: 20px; height: 20px; border: 2px solid black; margin: 4px 20px 0 0; }
-          </style>
-        </head>
-        <body><h1>\(escape(project.title))</h1>\(rows)</body>
-        </html>
-        """
-    }
-
-    private static func escape(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "'", with: "&#39;")
-    }
+/// Everything the system print panel needs. It carries the finished PDF rather
+/// than a formatter so the printed sheet is the file the user previewed and can
+/// export.
+struct ChecklistPrintJob {
+    let printInfo: UIPrintInfo
+    let pdfData: Data
 }
 
 @MainActor
 enum PrintService {
-    static func printFormatter(for project: ChecklistProject) -> UIPrintFormatter {
-        let formatter = UIMarkupTextPrintFormatter(
-            markupText: PrintHTMLBuilder.html(for: project)
-        )
-        formatter.perPageContentInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-        return formatter
+    static func printJob(for document: PrintReadyDocument) throws -> ChecklistPrintJob {
+        try document.verifyFitsWithinThePageLimit()
+
+        let printInfo = UIPrintInfo(dictionary: nil)
+        printInfo.outputType = .general
+        printInfo.jobName = document.project.title
+        printInfo.duplex = .none
+        printInfo.orientation = .portrait
+        return ChecklistPrintJob(printInfo: printInfo, pdfData: document.data)
     }
 
     static func present(
-        project: ChecklistProject,
+        document: PrintReadyDocument,
         completion: @escaping (Bool) -> Void = { _ in }
-    ) {
+    ) throws {
+        let job = try printJob(for: document)
+
         guard UIPrintInteractionController.isPrintingAvailable else {
             completion(false)
             return
         }
 
         let controller = UIPrintInteractionController.shared
-        let printInfo = UIPrintInfo(dictionary: nil)
-        printInfo.outputType = .general
-        printInfo.jobName = project.title
-        printInfo.duplex = .none
-        controller.printInfo = printInfo
+        controller.printInfo = job.printInfo
         controller.showsPageRange = false
-
-        controller.printFormatter = printFormatter(for: project)
+        controller.printingItem = job.pdfData
 
         let completionHandler: UIPrintInteractionController.CompletionHandler = {
             _, completed, error in
