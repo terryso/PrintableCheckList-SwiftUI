@@ -242,6 +242,10 @@ struct AIChecklistGenerationSheet: View {
                                     Text(source.url.host ?? source.url.absoluteString)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                    Label(source.url.absoluteString, systemImage: "link")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tint)
+                                        .lineLimit(1)
                                     if let publishedDate = source.publishedDate {
                                         Text(publishedDate)
                                             .font(.caption)
@@ -256,6 +260,7 @@ struct AIChecklistGenerationSheet: View {
                                 }
                             }
                             .accessibilityHint(Text("Opens the source in your browser"))
+                            .accessibilityIdentifier("aiSourceLink-\(source.id)")
                         }
                     }
                 } header: {
@@ -460,8 +465,12 @@ struct AIChecklistGenerationSheet: View {
                 isGenerating = false
                 generationTask = nil
                 errorMessage = error.localizedDescription
-                canContinueWithoutWebSearch = (error as? ChecklistGenerationError)
-                    == .webSearchUnavailable
+                canContinueWithoutWebSearch = switch error as? ChecklistGenerationError {
+                case .webSearchUnavailable, .webSearchEvidenceUnavailable:
+                    true
+                default:
+                    false
+                }
                 return
             }
             isGenerating = false

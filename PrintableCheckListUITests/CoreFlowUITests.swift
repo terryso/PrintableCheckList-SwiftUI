@@ -324,6 +324,14 @@ final class CoreFlowUITests: XCTestCase {
             summary.waitForExistence(timeout: 2),
             "BYOK web-search sources must show the source summary when available."
         )
+
+        XCTAssertTrue(
+            app.staticTexts
+                .containing(NSPredicate(format: "label CONTAINS %@", "https://example.com/travel"))
+                .firstMatch
+                .waitForExistence(timeout: 2),
+            "BYOK web-search sources must expose an HTTPS link."
+        )
     }
 
     func testManagedRouteExplainsNoWebSearchBoundary() {

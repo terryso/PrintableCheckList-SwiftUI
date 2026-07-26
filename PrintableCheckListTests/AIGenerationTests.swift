@@ -708,6 +708,99 @@ final class AIGenerationTests: XCTestCase {
         XCTAssertEqual(result.draft.items, ["Umbrella", "Power adapter"])
     }
 
+    func testGLMSearchRejectsNonHTTPSOrNonOfficialVisaSourcesBeforeGeneration() async throws {
+        let session = makeSession()
+        var requestedPaths: [String] = []
+        URLProtocolStub.setHandler { request in
+            requestedPaths.append(request.url?.path ?? "")
+            guard request.url?.path.hasSuffix("/web_search") == true else {
+                XCTFail("A rejected research result must not be sent to the checklist generator.")
+                return .response(status: 500, data: Data())
+            }
+            return .response(
+                status: 200,
+                data: Data(
+                    #"{"search_result":[{"title":"China Tokyo - Hialeah Online Ordering","content":"Chinese restaurant ordering and delivery.","link":"https://www.chinatokyorestaurant.com/","publish_date":"2026-07-25"},{"title":"Japan visa requirements","content":"Official-looking result over HTTP.","link":"http://www.mofa.go.jp/visa","publish_date":"2026-07-25"}]}"#.utf8
+                )
+            )
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: .default,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try GLMWebSearchResearcher(
+            baseURL: LLMProviderPreset.glm.defaultBaseURL,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .always
+        )
+
+        do {
+            _ = try await generator.generate(
+                request: Self.createRequest(withTopic: "Latest Japan visa entry requirements")
+            )
+            XCTFail("Expected insufficient source evidence to fail closed.")
+        } catch {
+            XCTAssertEqual(error as? ChecklistGenerationError, .webSearchEvidenceUnavailable)
+        }
+
+        XCTAssertEqual(requestedPaths, ["/api/paas/v4/web_search"])
+    }
+
+    func testGLMSearchUsesOfficialHTTPSVisaSourceBeforeGeneration() async throws {
+        let session = makeSession()
+        var requestedPaths: [String] = []
+        URLProtocolStub.setHandler { request in
+            requestedPaths.append(request.url?.path ?? "")
+            let body = try Self.bodyData(from: request)
+            let bodyText = try XCTUnwrap(String(data: body, encoding: .utf8))
+            if request.url?.path.hasSuffix("/web_search") == true {
+                return .response(
+                    status: 200,
+                    data: Data(
+                        #"{"search_result":[{"title":"Japan visa application requirements","content":"Official guidance for visa and entry requirements.","link":"https://www.mofa.go.jp/ca/fna/page4e_001053.html","publish_date":"2026-07-25"}]}"#.utf8
+                    )
+                )
+            }
+            XCTAssertTrue(bodyText.contains("mofa.go.jp"))
+            XCTAssertTrue(bodyText.contains("visa application requirements"))
+            return .response(status: 200, data: Self.successData)
+        }
+        let base = try OpenAICompatibleChecklistGenerator(
+            configuration: .default,
+            apiKey: "key",
+            session: session
+        )
+        let researcher = try GLMWebSearchResearcher(
+            baseURL: LLMProviderPreset.glm.defaultBaseURL,
+            apiKey: "key",
+            session: session
+        )
+        let generator = SearchEnhancedChecklistGenerator(
+            baseGenerator: base,
+            researcher: researcher,
+            configuredMode: .always
+        )
+
+        let result = try await generator.generate(
+            request: Self.createRequest(withTopic: "Latest Japan visa entry requirements")
+        )
+
+        XCTAssertEqual(requestedPaths, [
+            "/api/paas/v4/web_search",
+            "/api/paas/v4/chat/completions",
+        ])
+        XCTAssertTrue(result.didSearch)
+        XCTAssertEqual(result.sources.map(\.url.absoluteString), [
+            "https://www.mofa.go.jp/ca/fna/page4e_001053.html",
+        ])
+    }
+
     func testOpenAIResponsesSearchUsesSharedResultContract() async throws {
         let session = makeSession()
         let configuration = LLMConfiguration(

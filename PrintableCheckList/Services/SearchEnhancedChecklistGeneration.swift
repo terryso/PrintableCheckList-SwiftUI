@@ -84,7 +84,7 @@ final class SearchEnhancedChecklistGenerator: ChecklistGenerating {
             throw CancellationError()
         } catch let error as ChecklistGenerationError {
             switch error {
-            case .invalidAPIKey, .quotaExceeded:
+            case .invalidAPIKey, .quotaExceeded, .webSearchEvidenceUnavailable:
                 throw error
             default:
                 throw ChecklistGenerationError.webSearchUnavailable
@@ -204,11 +204,15 @@ final class GLMWebSearchResearcher: WebSearchResearching {
                 publishedDate: SearchContentSanitizer.optionalClean(item.publishDate, limit: 80)
             )
         }
-        guard !sources.isEmpty else {
-            throw ChecklistGenerationError.webSearchUnavailable
+        let reviewedSources = SearchSourcePolicy.reviewedSources(
+            sources,
+            for: query
+        )
+        guard !reviewedSources.isEmpty else {
+            throw ChecklistGenerationError.webSearchEvidenceUnavailable
         }
 
-        let summary = sources.enumerated().map { index, source in
+        let summary = reviewedSources.enumerated().map { index, source in
             var lines = [
                 "[\(index + 1)] \(source.title)",
                 "URL: \(source.url.absoluteString)",
@@ -222,7 +226,7 @@ final class GLMWebSearchResearcher: WebSearchResearching {
             return lines.joined(separator: "\n")
         }.joined(separator: "\n\n")
 
-        return SearchResearch(summary: summary, sources: sources)
+        return SearchResearch(summary: summary, sources: reviewedSources)
     }
 
     private static func validatedAPIKey(_ value: String) throws -> String {
@@ -321,9 +325,17 @@ final class OpenAIWebSearchResearcher: WebSearchResearching {
                 )
             }
 
+        let reviewedSources = SearchSourcePolicy.reviewedSources(
+            Array(sources.prefix(10)),
+            for: query
+        )
+        guard !reviewedSources.isEmpty else {
+            throw ChecklistGenerationError.webSearchEvidenceUnavailable
+        }
+
         return SearchResearch(
             summary: String(summary.prefix(18_000)),
-            sources: Array(sources.prefix(10))
+            sources: reviewedSources
         )
     }
 }
@@ -399,12 +411,70 @@ private enum SearchContentSanitizer {
             let value,
             let url = URL(string: value),
             let scheme = url.scheme?.lowercased(),
-            scheme == "https" || scheme == "http",
+            scheme == "https",
             url.host != nil
         else {
             return nil
         }
         return url
+    }
+}
+
+private enum SearchSourcePolicy {
+    private static let regulatedTravelTerms = [
+        "visa", "evisa", "entry", "immigration", "customs", "border", "passport",
+        "签证", "入境", "出入境", "移民", "海关", "边检", "护照",
+    ]
+
+    static func reviewedSources(
+        _ sources: [ChecklistSource],
+        for query: String
+    ) -> [ChecklistSource] {
+        guard requiresOfficialTravelSource(for: query) else {
+            return sources
+        }
+
+        return sources.filter { source in
+            isOfficialGovernmentHost(source.url.host)
+                && containsRegulatedTravelTerm(in: source)
+        }
+    }
+
+    private static func requiresOfficialTravelSource(for query: String) -> Bool {
+        containsRegulatedTravelTerm(in: query)
+    }
+
+    private static func containsRegulatedTravelTerm(in source: ChecklistSource) -> Bool {
+        containsRegulatedTravelTerm(
+            in: [source.title, source.url.host ?? "", source.snippet ?? ""]
+                .joined(separator: " ")
+        )
+    }
+
+    private static func containsRegulatedTravelTerm(in value: String) -> Bool {
+        let normalized = value.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+        return regulatedTravelTerms.contains { normalized.contains($0) }
+    }
+
+    private static func isOfficialGovernmentHost(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host.hasSuffix(".gov")
+            || host.contains(".gov.")
+            || host.hasSuffix(".gob")
+            || host.contains(".gob.")
+            || host.hasSuffix(".gouv.fr")
+            || host.hasSuffix(".go.jp")
+            || host.hasSuffix(".gc.ca")
+            || host.hasSuffix(".gov.uk")
+            || host.hasSuffix(".gov.au")
+            || host.hasSuffix(".gov.cn")
+            || host == "europa.eu"
+            || host.hasSuffix(".europa.eu")
+            || host == "un.org"
+            || host.hasSuffix(".un.org")
     }
 }
 

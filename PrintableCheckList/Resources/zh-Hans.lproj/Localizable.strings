@@ -185,6 +185,7 @@
 "Automatic search is used only for requests that need current information. Search queries go directly to the selected AI provider." = "自动模式只会在需要最新信息时联网；搜索内容会直接发送给所选 AI 服务商。";
 "This provider does not have a supported web search adapter, so generation uses the model's existing knowledge." = "当前服务商没有受支持的联网搜索适配器，将使用模型已有知识生成。";
 "Web search is temporarily unavailable. Try again or continue without web search." = "联网搜索暂时不可用，请重试或不联网继续生成。";
+"Web search returned no relevant HTTPS sources for this request. Try again or continue without web search." = "联网搜索没有返回与此请求相关的 HTTPS 来源。请重试，或在不联网搜索的情况下继续。";
 "Continue Without Web Search" = "不联网继续生成";
 "Sources" = "参考来源";
 "Web search was used for this result." = "本次结果使用了联网搜索。";

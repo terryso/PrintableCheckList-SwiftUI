@@ -148,6 +148,7 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
     case timedOut
     case serviceUnavailable
     case webSearchUnavailable
+    case webSearchEvidenceUnavailable
     case invalidResponse
     case managedServiceUnavailable
     case managedMonthlyLimitReached
@@ -169,6 +170,8 @@ enum ChecklistGenerationError: LocalizedError, Equatable {
             String(localized: "The AI service is temporarily unavailable. Please try again later.")
         case .webSearchUnavailable:
             String(localized: "Web search is temporarily unavailable. Try again or continue without web search.")
+        case .webSearchEvidenceUnavailable:
+            String(localized: "Web search returned no relevant HTTPS sources for this request. Try again or continue without web search.")
         case .invalidResponse:
             String(localized: "The AI service returned a result that could not be read. Please try again.")
         case .managedServiceUnavailable:
