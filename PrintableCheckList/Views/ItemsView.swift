@@ -63,18 +63,10 @@ struct ItemsView: View {
                                 systemImage: "doc.text.magnifyingglass"
                             )
                         }
-                        .accessibilityHint(Text("Preview the printable checklist"))
+                        .accessibilityHint(
+                            Text("Preview, export and print the print-ready checklist")
+                        )
                         .accessibilityIdentifier("previewButton")
-
-                        Spacer()
-
-                        Button {
-                            print(project)
-                        } label: {
-                            toolbarLabel("Print", systemImage: "printer")
-                        }
-                        .accessibilityHint(Text("Open the system print options"))
-                        .accessibilityIdentifier("printButton")
                     }
                 }
                 .navigationDestination(isPresented: $showsPreview) {
@@ -195,14 +187,6 @@ struct ItemsView: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("emptyAIAddItemsButton")
-            }
-        }
-    }
-
-    private func print(_ project: ChecklistProject) {
-        PrintService.present(project: project) { completed in
-            if completed {
-                store.markDeveloperAnalyticsConsentOpportunity()
             }
         }
     }

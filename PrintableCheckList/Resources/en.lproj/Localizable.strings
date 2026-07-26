@@ -75,6 +75,7 @@
 "Organize" = "Organize";
 "Preview Checklist" = "Preview Checklist";
 "Preview the printable checklist" = "Preview the printable checklist";
+"Preview, export and print the print-ready checklist" = "Preview, export and print the print-ready checklist";
 "Privacy" = "Privacy";
 "Reorder and delete" = "Reorder and delete";
 "Share Checklist Content for Product Analytics" = "Share Checklist Content for Product Analytics";
@@ -189,3 +190,15 @@
 "Web search was used for this result." = "Web search was used for this result.";
 "Opens the source in your browser" = "Opens the source in your browser";
 "Sources are provided for reference and are not saved in the checklist." = "Sources are provided for reference and are not saved in the checklist.";
+"A4" = "A4";
+"Letter" = "Letter";
+"Paper Size" = "Paper Size";
+"%ld page" = "%ld page";
+"%ld pages" = "%ld pages";
+"Export PDF" = "Export PDF";
+"Save or share the print-ready PDF" = "Save or share the print-ready PDF";
+"Choose the paper size and print from the preview" = "Choose the paper size and print from the preview";
+"Unable to Create PDF" = "Unable to Create PDF";
+"Checklist" = "Checklist";
+"%ld item does not fit on two pages. Shorten or remove items, or split this list." = "%ld item does not fit on two pages. Shorten or remove items, or split this list.";
+"%ld items do not fit on two pages. Shorten or remove items, or split this list." = "%ld items do not fit on two pages. Shorten or remove items, or split this list.";

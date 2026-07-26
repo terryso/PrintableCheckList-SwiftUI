@@ -32,15 +32,24 @@ struct PrintableCheckListApp: App {
                 ProcessInfo.processInfo.arguments.contains(
                     "-enableAnalyticsConsentForUITests"
                 ) ? UITestDeveloperSnapshotUploader() : nil
-            _store = StateObject(
-                wrappedValue: ChecklistStore(
-                    storage: FileChecklistStorage(fileURL: testFileURL),
-                    legacyData: nil,
-                    locale: Locale(identifier: "en"),
-                    userDefaults: testDefaults,
-                    developerSnapshotUploader: testAnalyticsUploader
-                )
+            let testStore = ChecklistStore(
+                storage: FileChecklistStorage(fileURL: testFileURL),
+                legacyData: nil,
+                locale: Locale(identifier: "en"),
+                userDefaults: testDefaults,
+                developerSnapshotUploader: testAnalyticsUploader
             )
+            if ProcessInfo.processInfo.arguments.contains(
+                "-seedOverlongChecklistForUITests"
+            ) {
+                testStore.addProject(
+                    title: "Overlong List",
+                    itemsText: (0..<90)
+                        .map { String(format: "Packing item %03ld", $0) }
+                        .joined(separator: "\n")
+                )
+            }
+            _store = StateObject(wrappedValue: testStore)
             let credentialStore = InMemoryLLMCredentialStore(
                 apiKey: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
                     || usesManagedOperationRetryGenerator
