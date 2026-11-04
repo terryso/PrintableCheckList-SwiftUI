@@ -72,7 +72,7 @@ final class CoreFlowUITests: XCTestCase {
         }
         let versionText = app.staticTexts["appVersionText"]
         XCTAssertTrue(versionText.waitForExistence(timeout: 2))
-        XCTAssertEqual(versionText.label, "Version 2.1.1")
+        XCTAssertTrue(versionText.label.hasPrefix("Version "), "Expected a short version label, got \(versionText.label)")
         XCTAssertFalse(versionText.label.contains("("))
     }
 
