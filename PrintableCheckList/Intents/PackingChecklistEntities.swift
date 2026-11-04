@@ -5,10 +5,9 @@ import Foundation
 /// for a list. It is not a reminder and has no due date.
 struct PackingChecklistEntity: AppEntity, Identifiable, Sendable {
     static var typeDisplayRepresentation = TypeDisplayRepresentation(
-        name: "Packing Checklist",
+        name: "Checklist",
         synonyms: [
             "Printable Checklist",
-            "Printable Packing List",
             "打包清单",
             "可打印清单",
         ]
@@ -60,9 +59,9 @@ struct PackingChecklistEntityQuery: EntityQuery, EntityStringQuery, EnumerableEn
 /// parent checklist so Shortcuts can resolve the item without a second store.
 struct PackingItemEntity: AppEntity, Identifiable, Sendable {
     static var typeDisplayRepresentation = TypeDisplayRepresentation(
-        name: "Packing Item",
+        name: "Checklist Item",
         synonyms: [
-            "Packing Line",
+            "Checklist Line",
             "打包物品",
             "行李物品",
         ]
