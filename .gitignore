@@ -5,3 +5,6 @@ DerivedData/
 xcuserdata/
 PrintableCheckList.xcodeproj/
 Config/Local.xcconfig
+Supabase/.branches/
+Supabase/.temp/
+Supabase/**/node_modules/
