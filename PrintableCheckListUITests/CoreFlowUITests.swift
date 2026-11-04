@@ -84,7 +84,17 @@ final class CoreFlowUITests: XCTestCase {
         let promptEditor = app.textViews["aiGenerationPromptEditor"]
         XCTAssertTrue(promptEditor.waitForExistence(timeout: 3))
         XCTAssertTrue((promptEditor.value as? String)?.contains("rankings") == true)
-        XCTAssertFalse(app.buttons["restoreDefaultAIPromptButton"].isEnabled)
+
+        // On physical devices the restore button can sit below the fold in the
+        // lazy form until the section is scrolled into view.
+        let restoreButton = app.buttons["restoreDefaultAIPromptButton"]
+        var scrollAttempts = 0
+        while !restoreButton.exists && scrollAttempts < 4 {
+            app.swipeUp()
+            scrollAttempts += 1
+        }
+        XCTAssertTrue(restoreButton.waitForExistence(timeout: 2))
+        XCTAssertFalse(restoreButton.isEnabled)
         XCTAssertTrue(
             app.descendants(matching: .any)["aiWebSearchPicker"].exists
         )
