@@ -5,7 +5,7 @@ import Foundation
 ///
 /// When an iOS 27.3 SDK is adopted, assistant-tool metadata
 /// (`@AppIntent(.tool)` / skills) can be added behind `@available(iOS 27.3, *)`
-/// on the existing packing intents. Do not invent a second checklist model.
+/// on the existing checklist intents. Do not invent a second checklist model.
 /// Do not expose reminders, notifications, generic to-dos, AI generation, or
 /// in-app purchase through that later surface.
 enum SiriAIIntentExtensionPoint {

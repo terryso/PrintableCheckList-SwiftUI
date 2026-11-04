@@ -2,7 +2,7 @@ import AppIntents
 
 /// Phrases Siri and the Shortcuts app should offer for Flash.
 ///
-/// Every phrase is about a printable packing checklist. Negative phrases keep
+/// Every phrase is about a printable checklist. Negative phrases keep
 /// reminder, to-do, and notification wording from resolving to this app.
 /// Localized phrase text lives in `AppShortcuts.strings`.
 struct FlashAppShortcuts: AppShortcutsProvider {
@@ -21,37 +21,37 @@ struct FlashAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: CreatePackingChecklistIntent(),
             phrases: [
-                "Create a packing checklist in \(.applicationName)",
-                "Make a printable packing list in \(.applicationName)",
+                "Create a checklist in \(.applicationName)",
+                "Make a printable checklist in \(.applicationName)",
             ],
-            shortTitle: "New Packing List",
+            shortTitle: "New Checklist",
             systemImageName: "list.bullet.clipboard"
         )
         AppShortcut(
             intent: AddPackingItemsIntent(),
             phrases: [
-                "Add packing items in \(.applicationName)",
+                "Add checklist items in \(.applicationName)",
                 "Add items to a printable checklist in \(.applicationName)",
             ],
-            shortTitle: "Add Packing Items",
+            shortTitle: "Add Checklist Items",
             systemImageName: "plus"
         )
         AppShortcut(
             intent: ShowPackingChecklistIntent(),
             phrases: [
-                "Show a packing checklist in \(.applicationName)",
+                "Show a checklist in \(.applicationName)",
                 "Open \(\.$target) in \(.applicationName)",
             ],
-            shortTitle: "Show Packing List",
+            shortTitle: "Open Checklist",
             systemImageName: "list.bullet"
         )
         AppShortcut(
             intent: ExportPrintReadyPDFIntent(),
             phrases: [
-                "Export a printable packing list from \(.applicationName)",
+                "Export a printable checklist from \(.applicationName)",
                 "Export a print-ready PDF of \(\.$packingList) from \(.applicationName)",
             ],
-            shortTitle: "Export Packing PDF",
+            shortTitle: "Export Checklist PDF",
             systemImageName: "square.and.arrow.up"
         )
         AppShortcut(
@@ -66,10 +66,10 @@ struct FlashAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: ListPackingChecklistsIntent(),
             phrases: [
-                "List my packing checklists in \(.applicationName)",
-                "Show my printable packing lists in \(.applicationName)",
+                "List my checklists in \(.applicationName)",
+                "Show my printable checklists in \(.applicationName)",
             ],
-            shortTitle: "Packing Lists",
+            shortTitle: "Checklists",
             systemImageName: "list.bullet.rectangle"
         )
     }

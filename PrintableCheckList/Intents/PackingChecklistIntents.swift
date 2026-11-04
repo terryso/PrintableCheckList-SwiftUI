@@ -9,11 +9,11 @@ enum PackingChecklistIntentError: Error, CustomLocalizedStringResourceConvertibl
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .emptyName:
-            "Enter a name for the packing checklist."
+            "Enter a name for the checklist."
         case .missingChecklist:
-            "That packing checklist is no longer on this device."
+            "That checklist is no longer on this device."
         case .emptyItems:
-            "Add at least one packing item."
+            "Add at least one checklist item."
         }
     }
 }
@@ -62,9 +62,9 @@ enum PackingChecklistCatalog {
 }
 
 struct ListPackingChecklistsIntent: AppIntent {
-    static var title: LocalizedStringResource = "List Packing Checklists"
+    static var title: LocalizedStringResource = "List Checklists"
     static var description = IntentDescription(
-        "List printable packing checklists on this device."
+        "List printable checklists on this device."
     )
     static var openAppWhenRun = false
 
@@ -72,29 +72,29 @@ struct ListPackingChecklistsIntent: AppIntent {
     static var supportedModes: IntentModes { .background }
 
     static var parameterSummary: some ParameterSummary {
-        Summary("List packing checklists")
+        Summary("List checklists")
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<[PackingChecklistEntity]> {
         let entities = try await PackingChecklistEntityQuery().allEntities()
         return .result(
             value: entities,
-            dialog: "Listed the packing checklists."
+            dialog: "Listed the checklists."
         )
     }
 }
 
 struct ListPackingItemsIntent: AppIntent {
-    static var title: LocalizedStringResource = "List Packing Items"
+    static var title: LocalizedStringResource = "List Checklist Items"
     static var description = IntentDescription(
-        "List the items in a printable packing checklist."
+        "List the items in a printable checklist."
     )
     static var openAppWhenRun = false
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .background }
 
-    @Parameter(title: "Packing Checklist", description: "The printable packing checklist.")
+    @Parameter(title: "Checklist", description: "The printable checklist.")
     var packingList: PackingChecklistEntity
 
     static var parameterSummary: some ParameterSummary {
@@ -105,18 +105,18 @@ struct ListPackingItemsIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<[PackingItemEntity]> {
         let project = try PackingChecklistCatalog.requireProject(packingList.id)
         let items = project.items.map { PackingItemEntity(project: project, item: $0) }
-        return .result(value: items, dialog: "Listed the packing items.")
+        return .result(value: items, dialog: "Listed the checklist items.")
     }
 }
 
 struct ShowPackingChecklistIntent: OpenIntent {
-    static var title: LocalizedStringResource = "Show Packing Checklist"
-    static var description = IntentDescription("Open a printable packing checklist.")
+    static var title: LocalizedStringResource = "Open Checklist"
+    static var description = IntentDescription("Open a printable checklist.")
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Packing Checklist", description: "The printable packing checklist.")
+    @Parameter(title: "Checklist", description: "The printable checklist.")
     var target: PackingChecklistEntity
 
     static var parameterSummary: some ParameterSummary {
@@ -127,21 +127,21 @@ struct ShowPackingChecklistIntent: OpenIntent {
     func perform() async throws -> some IntentResult {
         _ = try PackingChecklistCatalog.requireProject(target.id)
         ShortcutRouter.shared.open(.project(target.id))
-        return .result(dialog: "Opening the packing checklist.")
+        return .result(dialog: "Opening the checklist.")
     }
 }
 
 struct ShowPackingPrintPreviewIntent: AppIntent {
     static var title: LocalizedStringResource = "Show Print Preview"
     static var description = IntentDescription(
-        "Open the print preview for a packing checklist."
+        "Open the print preview for a checklist."
     )
     static var openAppWhenRun = true
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Packing Checklist", description: "The printable packing checklist.")
+    @Parameter(title: "Checklist", description: "The printable checklist.")
     var packingList: PackingChecklistEntity
 
     static var parameterSummary: some ParameterSummary {
@@ -157,21 +157,21 @@ struct ShowPackingPrintPreviewIntent: AppIntent {
 }
 
 struct CreatePackingChecklistIntent: AppIntent {
-    static var title: LocalizedStringResource = "Create Packing Checklist"
+    static var title: LocalizedStringResource = "Create Checklist"
     static var description = IntentDescription(
-        "Create a printable packing checklist. Does not set a reminder or a due date."
+        "Create a printable checklist. Does not set a reminder or a due date."
     )
     static var openAppWhenRun = false
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .background }
 
-    @Parameter(title: "Checklist Name", description: "Name of the printable packing checklist.")
+    @Parameter(title: "Checklist Name", description: "Name of the printable checklist.")
     var name: String
 
     @Parameter(
-        title: "Packing Items",
-        description: "One packing item per line. Leave blank to create an empty printable checklist."
+        title: "Checklist Items",
+        description: "One checklist item per line. Leave blank to create an empty printable checklist."
     )
     var itemsText: String?
 
@@ -187,26 +187,26 @@ struct CreatePackingChecklistIntent: AppIntent {
             name: name,
             itemsText: itemsText ?? ""
         )
-        return .result(value: entity, dialog: "Created a printable packing checklist.")
+        return .result(value: entity, dialog: "Created a printable checklist.")
     }
 }
 
 struct AddPackingItemsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Add Packing Items"
+    static var title: LocalizedStringResource = "Add Checklist Items"
     static var description = IntentDescription(
-        "Add items to a printable packing checklist."
+        "Add items to a printable checklist."
     )
     static var openAppWhenRun = false
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .background }
 
-    @Parameter(title: "Packing Checklist", description: "The printable packing checklist.")
+    @Parameter(title: "Checklist", description: "The printable checklist.")
     var packingList: PackingChecklistEntity
 
     @Parameter(
-        title: "Packing Items",
-        description: "The packing items to add. Each entry can also contain one item per line."
+        title: "Checklist Items",
+        description: "The checklist items to add. Each entry can also contain one item per line."
     )
     var itemTitles: [String]
 
@@ -223,7 +223,7 @@ struct AddPackingItemsIntent: AppIntent {
         let project = try PackingChecklistCatalog.requireProject(packingList.id)
         return .result(
             value: PackingChecklistEntity(project: project),
-            dialog: "Added the packing items."
+            dialog: "Added the checklist items."
         )
     }
 }
@@ -231,14 +231,14 @@ struct AddPackingItemsIntent: AppIntent {
 struct ExportPrintReadyPDFIntent: AppIntent {
     static var title: LocalizedStringResource = "Export Print-Ready PDF"
     static var description = IntentDescription(
-        "Export a print-ready PDF for a packing checklist so it can be shared or saved."
+        "Export a print-ready PDF for a checklist so it can be shared or saved."
     )
     static var openAppWhenRun = false
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .background }
 
-    @Parameter(title: "Packing Checklist", description: "The printable packing checklist.")
+    @Parameter(title: "Checklist", description: "The printable checklist.")
     var packingList: PackingChecklistEntity
 
     @Parameter(
