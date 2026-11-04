@@ -2,11 +2,13 @@ import SwiftUI
 
 private enum AppRoute: Hashable {
     case items(UUID)
+    case printPreview(UUID)
     case settings
 }
 
 struct HomeView: View {
     @EnvironmentObject private var store: ChecklistStore
+    @ObservedObject private var shortcutRouter = ShortcutRouter.shared
 
     @State private var path: [AppRoute] = []
     @State private var editMode: EditMode = .inactive
@@ -70,10 +72,16 @@ struct HomeView: View {
                 switch route {
                 case .items(let projectID):
                     ItemsView(projectID: projectID)
+                case .printPreview(let projectID):
+                    PreviewView(projectID: projectID)
                 case .settings:
                     SettingsView()
                 }
             }
+        }
+        .onAppear(perform: applyShortcutDestination)
+        .onChange(of: shortcutRouter.destination) { _, _ in
+            applyShortcutDestination()
         }
         .sheet(
             isPresented: $showsNewProject,
@@ -199,5 +207,20 @@ struct HomeView: View {
         guard let projectID = pendingCreatedProjectID else { return }
         pendingCreatedProjectID = nil
         path.append(.items(projectID))
+    }
+
+    /// Applies a Shortcuts request even if it was published before this view
+    /// appeared. Sheets are dismissed so the checklist or print preview is visible.
+    private func applyShortcutDestination() {
+        guard let destination = shortcutRouter.consume() else { return }
+        showsNewProject = false
+        showsAIGeneration = false
+        projectBeingEdited = nil
+        switch destination {
+        case .project(let projectID):
+            path = [.items(projectID)]
+        case .printPreview(let projectID):
+            path = [.items(projectID), .printPreview(projectID)]
+        }
     }
 }

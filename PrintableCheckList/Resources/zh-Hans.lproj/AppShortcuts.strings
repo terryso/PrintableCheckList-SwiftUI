@@ -1,0 +1,16 @@
+"Create a packing checklist in ${applicationName}" = "在${applicationName}新建打包清单";
+"Make a printable packing list in ${applicationName}" = "用${applicationName}做一份可打印打包清单";
+"Add packing items in ${applicationName}" = "在${applicationName}添加打包物品";
+"Add items to a printable checklist in ${applicationName}" = "在${applicationName}向可打印清单添加物品";
+"Show a packing checklist in ${applicationName}" = "在${applicationName}打开打包清单";
+"Open ${target} in ${applicationName}" = "在${applicationName}打开${target}";
+"Export a printable packing list from ${applicationName}" = "从${applicationName}导出可打印打包清单";
+"Export a print-ready PDF of ${packingList} from ${applicationName}" = "从${applicationName}导出${packingList}的打印就绪 PDF";
+"Open the print preview in ${applicationName}" = "在${applicationName}打开打印预览";
+"Preview ${packingList} in ${applicationName}" = "在${applicationName}预览${packingList}";
+"List my packing checklists in ${applicationName}" = "在${applicationName}列出我的打包清单";
+"Show my printable packing lists in ${applicationName}" = "在${applicationName}显示我的可打印打包清单";
+"Remind me in ${applicationName}" = "在${applicationName}提醒我";
+"Add a reminder in ${applicationName}" = "在${applicationName}添加提醒";
+"Add a todo in ${applicationName}" = "在${applicationName}添加待办";
+"Set a notification in ${applicationName}" = "在${applicationName}设置通知";

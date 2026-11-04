@@ -45,6 +45,7 @@ struct PrintableCheckListApp: App {
                         .joined(separator: "\n")
                 )
             }
+            ChecklistSession.install(testStore)
             _store = StateObject(wrappedValue: testStore)
             let credentialStore = InMemoryLLMCredentialStore(
                 apiKey: usesFakeGenerator || usesFlakyGenerator || usesSlowGenerator
@@ -69,19 +70,21 @@ struct PrintableCheckListApp: App {
         }
 
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            _store = StateObject(wrappedValue: ChecklistStore())
+            let unitStore = ChecklistStore()
+            ChecklistSession.install(unitStore)
+            _store = StateObject(wrappedValue: unitStore)
             _aiSettings = StateObject(wrappedValue: LLMConfigurationStore())
             generatorOverride = nil
             return
         }
         #endif
 
-        _store = StateObject(
-            wrappedValue: ChecklistStore(
-                iCloudSyncService: ICloudSyncService(),
-                developerSnapshotUploader: DeveloperSnapshotUploaderFactory.make()
-            )
+        let store = ChecklistStore(
+            iCloudSyncService: ICloudSyncService(),
+            developerSnapshotUploader: DeveloperSnapshotUploaderFactory.make()
         )
+        ChecklistSession.install(store)
+        _store = StateObject(wrappedValue: store)
         _aiSettings = StateObject(wrappedValue: LLMConfigurationStore())
         generatorOverride = nil
     }
